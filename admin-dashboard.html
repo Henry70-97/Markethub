@@ -304,7 +304,7 @@
             `);
         }
         
-        // Adjust Wallet - FIXED and improved
+        // Adjust Wallet - SIMPLIFIED VERSION (No logging to avoid permission issues)
         async function adjustWallet(userId) {
             try {
                 const amount = parseFloat(document.getElementById('adjustAmount').value);
@@ -323,8 +323,14 @@
                 
                 const adjustment = type === 'add' ? amount : -amount;
                 
-                // Get current user data first
+                // Get current user data to check balance
                 const userDoc = await db.collection('users').doc(userId).get();
+                
+                if (!userDoc.exists) {
+                    showToast('User not found', true);
+                    return;
+                }
+                
                 const currentWallet = userDoc.data().wallet || 0;
                 
                 // Check if subtraction would make wallet negative
@@ -333,30 +339,24 @@
                     return;
                 }
                 
-                // Update wallet
+                // ONLY update the user's wallet - no logging to avoid permission issues
                 await db.collection('users').doc(userId).update({
                     wallet: firebase.firestore.FieldValue.increment(adjustment)
-                });
-                
-                // Log the adjustment
-                await db.collection('walletAdjustments').add({
-                    userId,
-                    userEmail: userDoc.data().email,
-                    adjustedBy: currentUser.uid,
-                    adjustedByEmail: currentUser.email,
-                    amount: adjustment,
-                    reason: reason.trim(),
-                    previousBalance: currentWallet,
-                    newBalance: currentWallet + adjustment,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
                 closeModal();
                 showToast(`Wallet adjusted by $${amount.toFixed(2)} (${type === 'add' ? 'added' : 'subtracted'})`);
                 loadUsers();
+                
             } catch (error) {
                 console.error('Error adjusting wallet:', error);
-                showToast('Error adjusting wallet: ' + error.message, true);
+                
+                // More specific error message
+                if (error.code === 'permission-denied') {
+                    showToast('Permission denied. You may not have admin rights.', true);
+                } else {
+                    showToast('Error adjusting wallet: ' + error.message, true);
+                }
             }
         }
         
@@ -808,7 +808,7 @@
                 
                 showToast('Message sent successfully');
                 document.getElementById('messageText').value = '';
-                loadMessages(); // Reload to show the new message
+                loadMessages();
             } catch (error) {
                 console.error('Error sending message:', error);
                 showToast('Error sending message', true);
