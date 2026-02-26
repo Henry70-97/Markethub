@@ -264,49 +264,64 @@
             loadUsers();
         }
         
-        // Show Adjust Wallet Modal
+        // Show Adjust Wallet Modal - FIXED: Changed button class
         function showAdjustWallet(userId, userName, currentWallet) {
             showModal(`
                 <h3 style="margin-bottom:1rem;">Adjust Wallet - ${userName}</h3>
                 <p>Current Balance: $${currentWallet}</p>
-                <input type="number" id="adjustAmount" placeholder="Amount">
+                <input type="number" id="adjustAmount" placeholder="Amount" step="0.01" min="0">
                 <select id="adjustType">
                     <option value="add">Add Funds</option>
                     <option value="subtract">Subtract Funds</option>
                 </select>
-                <textarea id="adjustReason" placeholder="Reason for adjustment"></textarea>
-                <button class="btn btn-primary" id="applyAdjustmentBtn" data-user-id="${userId}" style="width:100%;">Apply</button>
+                <textarea id="adjustReason" placeholder="Reason for adjustment (required)"></textarea>
+                <button class="btn btn-primary apply-adjustment-btn" data-user-id="${userId}" style="width:100%;">Apply</button>
             `);
         }
         
-        // Adjust Wallet
+        // Adjust Wallet - FIXED: Added better error handling
         async function adjustWallet(userId) {
-            const amount = parseFloat(document.getElementById('adjustAmount').value);
-            const type = document.getElementById('adjustType').value;
-            const reason = document.getElementById('adjustReason').value;
+            const amount = parseFloat(document.getElementById('adjustAmount')?.value);
+            const type = document.getElementById('adjustType')?.value;
+            const reason = document.getElementById('adjustReason')?.value;
             
-            if (!amount || amount <= 0 || !reason) {
-                showToast('Enter valid amount and reason', true);
+            if (!amount || amount <= 0) {
+                showToast('Please enter a valid amount greater than 0', true);
+                return;
+            }
+            
+            if (!reason || reason.trim() === '') {
+                showToast('Please enter a reason for the adjustment', true);
+                return;
+            }
+            
+            if (!userId) {
+                showToast('User ID is missing', true);
                 return;
             }
             
             const adjustment = type === 'add' ? amount : -amount;
             
-            await db.collection('users').doc(userId).update({
-                wallet: firebase.firestore.FieldValue.increment(adjustment)
-            });
-            
-            await db.collection('walletAdjustments').add({
-                userId,
-                adjustedBy: currentUser.uid,
-                amount: adjustment,
-                reason,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            closeModal();
-            showToast(`Wallet adjusted by $${amount}`);
-            loadUsers();
+            try {
+                await db.collection('users').doc(userId).update({
+                    wallet: firebase.firestore.FieldValue.increment(adjustment)
+                });
+                
+                await db.collection('walletAdjustments').add({
+                    userId,
+                    adjustedBy: currentUser.uid,
+                    amount: adjustment,
+                    reason: reason.trim(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                closeModal();
+                showToast(`Wallet adjusted by $${amount.toFixed(2)}`);
+                loadUsers();
+            } catch (error) {
+                console.error('Error adjusting wallet:', error);
+                showToast('Error adjusting wallet: ' + error.message, true);
+            }
         }
         
         // Load Tasks
@@ -689,7 +704,7 @@
             document.getElementById('messageText').value = '';
         }
         
-        // Event Delegation for all buttons
+        // Event Delegation for all buttons - FIXED: Added apply-adjustment-btn handler
         document.addEventListener('click', async (e) => {
             const target = e.target;
             
@@ -724,8 +739,8 @@
                 return;
             }
             
-            // Apply Adjustment button (inside modal)
-            if (target.id === 'applyAdjustmentBtn') {
+            // Apply Adjustment button (inside modal) - FIXED: This is the key fix
+            if (target.classList.contains('apply-adjustment-btn')) {
                 const userId = target.getAttribute('data-user-id');
                 await adjustWallet(userId);
                 return;
