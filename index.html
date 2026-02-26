@@ -3,186 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nextgen | Task Marketplace</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>NextGen · Task Platform</title>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        .hidden { display: none; }
-        .active-tab { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: bold; }
-        .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
-        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: linear-gradient(145deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .auth-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 2rem; padding: 2.5rem; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .logo { text-align: center; margin-bottom: 2rem; }
+        .logo h1 { font-size: 2rem; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .tab { flex: 1; padding: 1rem; border: none; border-radius: 40px; font-weight: 600; background: #f1f5f9; color: #475569; cursor: pointer; transition: all 0.3s; }
+        .tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .form { display: block; }
+        .form.hidden { display: none; }
+        .input-group { margin-bottom: 1rem; }
+        .input-group input, .input-group select { width: 100%; padding: 1rem 1.2rem; border-radius: 40px; border: 2px solid #e2e8f0; font-size: 1rem; transition: all 0.3s; }
+        .input-group input:focus { border-color: #667eea; outline: none; }
+        .btn { width: 100%; padding: 1rem; border: none; border-radius: 40px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-google { background: white; color: #333; border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+        .btn-google:hover { background: #f8fafc; }
+        .divider { text-align: center; margin: 1.5rem 0; position: relative; }
+        .divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e2e8f0; }
+        .divider span { background: white; padding: 0 1rem; position: relative; color: #64748b; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 1rem 2rem; border-radius: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: none; z-index: 1000; }
+        .link { text-align: center; margin-top: 1rem; }
+        .link a { color: #667eea; text-decoration: none; font-weight: 600; cursor: pointer; }
+        .info-text { text-align: center; color: #64748b; margin: 1rem 0; font-size: 0.9rem; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
-
-    <!-- Navbar -->
-    <nav class="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center gap-2">
-            <div class="bg-blue-600 text-white w-10 h-10 flex items-center justify-center rounded-xl font-black text-2xl shadow-lg shadow-blue-200">N</div>
-            <h1 class="text-2xl font-black text-slate-800 tracking-tight">Nextgen</h1>
+<body>
+    <div class="auth-card">
+        <div class="logo">
+            <h1>🔷 NextGen Tasks</h1>
         </div>
-        <div id="nav-user" class="hidden flex items-center gap-4">
-            <div class="text-right">
-                <p id="nav-email" class="text-xs font-bold text-slate-700"></p>
-                <p id="nav-role" class="text-[10px] uppercase text-blue-600 font-bold tracking-widest"></p>
-            </div>
-            <button id="logout-btn" class="bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg transition active:scale-90">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            </button>
-        </div>
-    </nav>
-
-    <main class="max-w-6xl mx-auto p-4 md:p-8">
         
-        <!-- AUTH SECTION -->
-        <div id="auth-section" class="max-w-md mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 border border-slate-100">
-            <h2 class="text-3xl font-black text-center mb-2 text-slate-800">Welcome</h2>
-            <p class="text-center text-slate-500 mb-8 text-sm">Join Nextgen to start earning or posting tasks.</p>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('login')">Login</button>
+            <button class="tab" onclick="switchTab('register')">Register</button>
+        </div>
+        
+        <!-- Login Form -->
+        <div id="loginForm" class="form">
+            <div class="input-group">
+                <input type="email" id="loginEmail" placeholder="Email address">
+            </div>
+            <div class="input-group">
+                <input type="password" id="loginPassword" placeholder="Password">
+            </div>
+            <button class="btn btn-primary" onclick="handleLogin()">Sign In</button>
             
-            <button id="google-btn" class="w-full flex items-center justify-center gap-3 border-2 border-slate-100 p-3 rounded-2xl hover:bg-slate-50 transition active:scale-95 font-bold mb-6">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/01/20/google_light.svg" width="22">
-                Continue with Google
+            <div class="divider">
+                <span>OR</span>
+            </div>
+            
+            <button class="btn btn-google" onclick="handleGoogleLogin()">
+                <i class="fab fa-google"></i> Continue with Google
             </button>
-
-            <div class="flex border-b mb-6 overflow-hidden">
-                <button onclick="switchAuthTab('email')" id="tab-email" class="flex-1 py-2 text-sm active-tab">Email</button>
-                <button onclick="switchAuthTab('phone')" id="tab-phone" class="flex-1 py-2 text-sm text-slate-400">Phone</button>
+        </div>
+        
+        <!-- Register Form -->
+        <div id="registerForm" class="form hidden">
+            <div class="input-group">
+                <input type="text" id="regName" placeholder="Full name">
             </div>
-
-            <!-- Email Login -->
-            <div id="email-panel">
-                <input type="email" id="auth-email" placeholder="Email Address" class="w-full border-2 border-slate-100 p-3 rounded-xl mb-3 focus:border-blue-500 outline-none transition">
-                <input type="password" id="auth-password" placeholder="Password" class="w-full border-2 border-slate-100 p-3 rounded-xl mb-4 focus:border-blue-500 outline-none transition">
-                <div class="flex gap-3">
-                    <button id="login-btn" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition active:scale-95">Login</button>
-                    <button id="signup-btn" class="flex-1 border-2 border-blue-600 text-blue-600 py-3 rounded-xl font-bold hover:bg-blue-50 transition active:scale-95">Sign Up</button>
-                </div>
+            <div class="input-group">
+                <input type="email" id="regEmail" placeholder="Email address">
             </div>
-
-            <!-- Phone Login -->
-            <div id="phone-panel" class="hidden">
-                <div class="flex gap-2">
-                    <input type="text" id="phone-number" placeholder="+1234567890" class="flex-1 border-2 border-slate-100 p-3 rounded-xl focus:border-blue-500 outline-none transition">
-                    <button id="send-code-btn" class="bg-slate-800 text-white px-4 rounded-xl text-sm font-bold active:scale-95">Send SMS</button>
-                </div>
-                <div id="recaptcha-container" class="mt-4"></div>
+            <div class="input-group">
+                <input type="password" id="regPassword" placeholder="Password (min 6 characters)">
+            </div>
+            <div class="input-group">
+                <input type="tel" id="regPhone" placeholder="Phone number (optional)">
+            </div>
+            <button class="btn btn-primary" onclick="handleRegister()">Create Account</button>
+            <div class="info-text">
+                <i class="fas fa-info-circle"></i> A verification email will be sent
             </div>
         </div>
-
-        <!-- DASHBOARD CONTAINER -->
-        <div id="dashboard-container" class="hidden">
-            
-            <!-- ROLE SELECTION -->
-            <div id="role-selection" class="hidden text-center py-10">
-                <h2 class="text-3xl font-black mb-8">Select Your Purpose</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-                    <button onclick="setRole('user')" class="p-8 bg-white border-4 border-transparent hover:border-blue-500 rounded-3xl shadow-lg transition-all group active:scale-95">
-                        <div class="text-5xl mb-4 group-hover:scale-110 transition">🖋️</div>
-                        <h3 class="text-xl font-bold">I am a Worker</h3>
-                        <p class="text-slate-500 text-sm mt-2">Browse history and essay tasks to earn money.</p>
-                    </button>
-                    <button onclick="setRole('admin')" class="p-8 bg-white border-4 border-transparent hover:border-purple-500 rounded-3xl shadow-lg transition-all group active:scale-95">
-                        <div class="text-5xl mb-4 group-hover:scale-110 transition">👑</div>
-                        <h3 class="text-xl font-bold">I am an Admin</h3>
-                        <p class="text-slate-500 text-sm mt-2">Post tasks and review user submissions.</p>
-                    </button>
+        
+        <!-- Verify Email Message -->
+        <div id="verifyMessage" class="form hidden">
+            <div style="text-align: center;">
+                <i class="fas fa-envelope-circle-check" style="font-size: 3rem; color: #667eea; margin-bottom: 1rem;"></i>
+                <h3 style="margin-bottom: 1rem;">Verify Your Email</h3>
+                <p style="color: #64748b; margin-bottom: 1.5rem;">We've sent a verification link to <span id="verifyEmail"></span></p>
+                <button class="btn btn-primary" onclick="checkVerification()">I've Verified, Continue</button>
+                <div class="link" style="margin-top: 1rem;">
+                    <a onclick="resendVerification()">Resend verification email</a>
                 </div>
-            </div>
-
-            <!-- ADMIN DASHBOARD -->
-            <div id="admin-view" class="hidden">
-                <div class="flex justify-between items-center mb-10">
-                    <h2 class="text-4xl font-black text-slate-800 tracking-tight">Admin Hub</h2>
-                    <button onclick="toggleModal('task-modal', true)" class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl shadow-blue-200 hover:bg-blue-700 transition active:scale-95">+ POST NEW TASK</button>
-                </div>
-                <h3 class="font-black text-slate-400 uppercase tracking-widest text-xs mb-6">Pending Submissions</h3>
-                <div id="admin-subs-list" class="space-y-6"></div>
-            </div>
-
-            <!-- USER DASHBOARD -->
-            <div id="user-view" class="hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div>
-                        <h3 class="font-black text-slate-400 uppercase tracking-widest text-xs mb-6">Available Jobs</h3>
-                        <div id="user-tasks-list" class="space-y-4"></div>
-                    </div>
-                    <div>
-                        <h3 class="font-black text-slate-400 uppercase tracking-widest text-xs mb-6">My Submission Status</h3>
-                        <div id="user-subs-list" class="space-y-4"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- MODALS -->
-    <!-- Verification Modal -->
-    <div id="verify-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
-            <div class="text-6xl mb-4">📩</div>
-            <h3 class="text-2xl font-bold mb-2">Verify Email</h3>
-            <p class="text-slate-500 mb-8">We sent a link to your email. Click it to activate your account, then refresh this page.</p>
-            <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black active:scale-95 shadow-lg">I HAVE VERIFIED</button>
-        </div>
-    </div>
-
-    <!-- Phone SMS Code Modal -->
-    <div id="phone-code-modal" class="hidden fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-3xl max-w-sm w-full text-center">
-            <h3 class="text-2xl font-bold mb-4">Enter SMS Code</h3>
-            <input type="text" id="sms-code" placeholder="123456" class="w-full border-4 border-slate-50 p-4 rounded-2xl text-center text-3xl font-black tracking-widest mb-6 focus:border-blue-500 outline-none">
-            <button id="verify-code-btn" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold active:scale-95">Verify & Login</button>
-        </div>
-    </div>
-
-    <!-- Post Task Modal -->
-    <div id="task-modal" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl">
-            <h2 class="text-2xl font-black mb-6">Post a New Task</h2>
-            <input type="text" id="task-title" placeholder="Task Title (e.g. World War II Analysis)" class="w-full border-2 border-slate-100 p-3 rounded-xl mb-4 focus:border-blue-500 outline-none">
-            <textarea id="task-desc" placeholder="Writing instructions and requirements..." class="w-full border-2 border-slate-100 p-3 rounded-xl h-32 mb-4 focus:border-blue-500 outline-none"></textarea>
-            <div class="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase">Category</label>
-                    <select id="task-cat" class="w-full border-2 border-slate-100 p-3 rounded-xl font-bold">
-                        <option>History</option>
-                        <option>Essay</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase">Reward ($)</label>
-                    <input type="number" id="task-reward" placeholder="50" class="w-full border-2 border-slate-100 p-3 rounded-xl font-bold">
-                </div>
-            </div>
-            <div class="flex gap-3">
-                <button id="btn-save-task" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black active:scale-95">CREATE TASK</button>
-                <button onclick="toggleModal('task-modal', false)" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold active:scale-95">CANCEL</button>
             </div>
         </div>
     </div>
-
-    <!-- Submit Task Modal -->
-    <div id="submit-modal" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white p-8 rounded-3xl w-full max-w-2xl shadow-2xl">
-            <h2 id="modal-sub-title" class="text-2xl font-black mb-1">Submit Work</h2>
-            <p class="text-slate-500 mb-6">Paste your text below or upload a supporting file.</p>
-            <textarea id="sub-text" placeholder="Type or paste your work here..." class="w-full border-2 border-slate-100 p-4 rounded-2xl h-64 mb-6 focus:border-blue-500 outline-none"></textarea>
-            <div class="mb-8 p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Optional Attachment (DOCX/PDF)</label>
-                <input type="file" id="sub-file" class="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-            </div>
-            <div class="flex gap-3">
-                <button id="btn-final-submit" class="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black active:scale-95 shadow-lg shadow-green-100">SUBMIT FOR REVIEW</button>
-                <button onclick="toggleModal('submit-modal', false)" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold active:scale-95">CANCEL</button>
-            </div>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, onSnapshot, updateDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
-
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyChk2JA68-I5s1D0S10r9WK71LgTNi4hRQ",
             authDomain: "nextgen-5fb6f.firebaseapp.com",
@@ -191,210 +115,183 @@
             messagingSenderId: "100132076455",
             appId: "1:100132076455:web:c5aea1f6e1a5ebbea99482"
         };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
-        const googleProvider = new GoogleAuthProvider();
-
-        const MASTER_KEY = "NEXTGEN_2024";
-        let confirmationResult = null;
-        let activeTaskId = null;
-
-        // --- AUTH LOGIC ---
-        window.switchAuthTab = (type) => {
-            document.getElementById('email-panel').classList.toggle('hidden', type !== 'email');
-            document.getElementById('phone-panel').classList.toggle('hidden', type !== 'phone');
-            document.getElementById('tab-email').className = type === 'email' ? 'flex-1 py-2 text-sm active-tab' : 'flex-1 py-2 text-sm text-slate-400';
-            document.getElementById('tab-phone').className = type === 'phone' ? 'flex-1 py-2 text-sm active-tab' : 'flex-1 py-2 text-sm text-slate-400';
-        };
-
-        document.getElementById('google-btn').onclick = () => signInWithPopup(auth, googleProvider);
-
-        document.getElementById('signup-btn').onclick = async () => {
-            const e = document.getElementById('auth-email').value, p = document.getElementById('auth-password').value;
+        
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        let currentUser = null;
+        
+        // Toast function
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.style.background = isError ? '#dc2626' : '#1e293b';
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+        
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'login') {
+                document.getElementById('loginForm').classList.remove('hidden');
+                document.getElementById('registerForm').classList.add('hidden');
+                document.getElementById('verifyMessage').classList.add('hidden');
+            } else {
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+                document.getElementById('verifyMessage').classList.add('hidden');
+            }
+        }
+        
+        // Show verify view
+        function showVerifyView(email) {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('verifyMessage').classList.remove('hidden');
+            document.getElementById('verifyEmail').textContent = email;
+        }
+        
+        // Handle Registration
+        async function handleRegister() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const phone = document.getElementById('regPhone').value;
+            
+            if (!name || !email || !password) {
+                showToast('Please fill all required fields', true);
+                return;
+            }
+            
+            if (password.length < 6) {
+                showToast('Password must be at least 6 characters', true);
+                return;
+            }
+            
             try {
-                const cred = await createUserWithEmailAndPassword(auth, e, p);
-                await sendEmailVerification(cred.user);
-                document.getElementById('verify-modal').classList.remove('hidden');
-            } catch (err) { alert(err.message); }
-        };
-
-        document.getElementById('login-btn').onclick = () => {
-            const e = document.getElementById('auth-email').value, p = document.getElementById('auth-password').value;
-            signInWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
-        };
-
-        // Phone Auth
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'normal' });
-        document.getElementById('send-code-btn').onclick = async () => {
-            const num = document.getElementById('phone-number').value;
-            confirmationResult = await signInWithPhoneNumber(auth, num, window.recaptchaVerifier);
-            document.getElementById('phone-code-modal').classList.remove('hidden');
-        };
-        document.getElementById('verify-code-btn').onclick = async () => {
-            await confirmationResult.confirm(document.getElementById('sms-code').value);
-            document.getElementById('phone-code-modal').classList.add('hidden');
-        };
-
-        document.getElementById('logout-btn').onclick = () => signOut(auth).then(() => location.reload());
-
-        // --- ROLE & DASHBOARD ---
-        onAuthStateChanged(auth, async (user) => {
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                await cred.user.sendEmailVerification();
+                
+                // Create user document
+                await db.collection('users').doc(cred.user.uid).set({
+                    email,
+                    displayName: name,
+                    phone: phone || '',
+                    role: 'user',
+                    wallet: 0,
+                    active: true,
+                    verified: false,
+                    membershipPaid: false,
+                    membershipStatus: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showVerifyView(email);
+                showToast('Verification email sent!');
+            } catch (error) {
+                showToast(error.message, true);
+            }
+        }
+        
+        // Handle Login
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showToast('Please enter email and password', true);
+                return;
+            }
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                showToast(error.message, true);
+            }
+        }
+        
+        // Handle Google Login
+        async function handleGoogleLogin() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await auth.signInWithPopup(provider);
+                const user = result.user;
+                
+                const userRef = db.collection('users').doc(user.uid);
+                const userDoc = await userRef.get();
+                
+                if (!userDoc.exists) {
+                    await userRef.set({
+                        email: user.email,
+                        displayName: user.displayName,
+                        phone: '',
+                        role: 'user',
+                        wallet: 0,
+                        active: true,
+                        verified: true,
+                        membershipPaid: false,
+                        membershipStatus: 'pending',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            } catch (error) {
+                showToast(error.message, true);
+            }
+        }
+        
+        // Check Verification
+        async function checkVerification() {
+            if (auth.currentUser) {
+                await auth.currentUser.reload();
+                if (auth.currentUser.emailVerified) {
+                    await db.collection('users').doc(auth.currentUser.uid).update({ verified: true });
+                    window.location.href = 'user-dashboard.html';
+                } else {
+                    showToast('Email not verified yet', true);
+                }
+            }
+        }
+        
+        // Resend Verification
+        async function resendVerification() {
+            if (auth.currentUser) {
+                await auth.currentUser.sendEmailVerification();
+                showToast('Verification email resent!');
+            }
+        }
+        
+        // Auth State Observer
+        auth.onAuthStateChanged(async (user) => {
             if (user) {
-                if (user.providerData[0].providerId === 'password' && !user.emailVerified) {
-                    document.getElementById('verify-modal').classList.remove('hidden');
+                const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
+                
+                if (!user.emailVerified && !isGoogle) {
+                    showVerifyView(user.email);
                     return;
                 }
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('dashboard-container').classList.remove('hidden');
-                document.getElementById('nav-user').classList.remove('hidden');
-                document.getElementById('nav-email').innerText = user.email || user.phoneNumber;
-
-                if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    document.getElementById('nav-role').innerText = data.role;
-                    data.role === 'admin' ? showAdmin() : showUser();
-                } else {
-                    document.getElementById('role-selection').classList.remove('hidden');
+                
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    
+                    if (userData.active === false) {
+                        await auth.signOut();
+                        showToast('Account deactivated', true);
+                        return;
+                    }
+                    
+                    if (userData.role === 'admin') {
+                        window.location.href = 'admin-dashboard.html';
+                    } else {
+                        window.location.href = 'user-dashboard.html';
+                    }
                 }
-            } else {
-                document.getElementById('auth-section').classList.remove('hidden');
             }
         });
-
-        window.setRole = async (role) => {
-            if (role === 'admin' && prompt("Enter Master Admin Key:") !== MASTER_KEY) return alert("Wrong key!");
-            await setDoc(doc(db, "users", auth.currentUser.uid), {
-                email: auth.currentUser.email || auth.currentUser.phoneNumber,
-                role: role,
-                createdAt: serverTimestamp()
-            });
-            location.reload();
-        };
-
-        // --- ADMIN FUNCTIONS ---
-        function showAdmin() {
-            document.getElementById('admin-view').classList.remove('hidden');
-            onSnapshot(query(collection(db, "submissions"), orderBy("submittedAt", "desc")), (snap) => {
-                const list = document.getElementById('admin-subs-list');
-                list.innerHTML = "";
-                snap.forEach(d => {
-                    const s = d.data();
-                    const el = document.createElement('div');
-                    el.className = "bg-white p-6 rounded-3xl border shadow-sm";
-                    el.innerHTML = `
-                        <div class="flex justify-between items-start mb-6">
-                            <div>
-                                <h4 class="text-xl font-black text-slate-800">${s.taskTitle}</h4>
-                                <p class="text-xs font-bold text-slate-400 uppercase tracking-tighter">By: ${s.userEmail}</p>
-                            </div>
-                            <span class="px-4 py-1 rounded-full text-[10px] font-black uppercase ${s.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}">${s.status}</span>
-                        </div>
-                        <div class="bg-slate-50 p-6 rounded-2xl text-sm italic text-slate-600 mb-6 whitespace-pre-line leading-relaxed border border-slate-100">${s.contentText}</div>
-                        ${s.fileUrl ? `<a href="${s.fileUrl}" target="_blank" class="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-bold text-xs mb-6">📎 VIEW ATTACHMENT</a>` : ''}
-                        
-                        <div class="border-t border-slate-50 pt-6">
-                            <label class="block text-[10px] font-black text-slate-400 uppercase mb-3">Your Feedback to User</label>
-                            <textarea id="fb-${d.id}" class="w-full border-2 border-slate-100 rounded-2xl p-4 text-sm mb-4 focus:border-blue-500 outline-none" placeholder="Provide feedback here...">${s.adminFeedback || ''}</textarea>
-                            <div class="flex gap-2">
-                                <button onclick="review('${d.id}', 'paid')" class="bg-green-600 text-white px-6 py-3 rounded-xl text-xs font-black active:scale-95">APPROVE & PAY</button>
-                                <button onclick="review('${d.id}', 'cancelled')" class="bg-red-50 text-red-600 px-6 py-3 rounded-xl text-xs font-black active:scale-95">CANCEL</button>
-                            </div>
-                        </div>
-                    `;
-                    list.appendChild(el);
-                });
-            });
-        }
-
-        document.getElementById('btn-save-task').onclick = async () => {
-            const t = document.getElementById('task-title').value, d = document.getElementById('task-desc').value, r = document.getElementById('task-reward').value, c = document.getElementById('task-cat').value;
-            if(!t || !r) return alert("Title and Reward are required");
-            await addDoc(collection(db, "tasks"), { title: t, desc: d, reward: r, cat: c, createdAt: serverTimestamp() });
-            toggleModal('task-modal', false);
-        };
-
-        window.review = async (id, status) => {
-            const fb = document.getElementById(`fb-${id}`).value;
-            await updateDoc(doc(db, "submissions", id), { status: status, adminFeedback: fb });
-            alert("Submission Processed!");
-        };
-
-        // --- USER FUNCTIONS ---
-        function showUser() {
-            document.getElementById('user-view').classList.remove('hidden');
-            // Tasks
-            onSnapshot(collection(db, "tasks"), (snap) => {
-                const list = document.getElementById('user-tasks-list');
-                list.innerHTML = "";
-                snap.forEach(d => {
-                    const t = d.data();
-                    const el = document.createElement('div');
-                    el.className = "bg-white p-6 rounded-3xl shadow-sm border-2 border-transparent hover:border-blue-500 transition-all active:scale-[0.98]";
-                    el.innerHTML = `
-                        <div class="flex justify-between items-start mb-4">
-                            <span class="bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-lg uppercase">${t.cat}</span>
-                            <span class="text-2xl font-black text-slate-800 tracking-tight">$${t.reward}</span>
-                        </div>
-                        <h4 class="font-black text-xl mb-2 text-slate-800">${t.title}</h4>
-                        <p class="text-slate-500 text-sm mb-6 line-clamp-3 leading-relaxed">${t.desc}</p>
-                        <button onclick="openSubmit('${d.id}', '${t.title}')" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black active:scale-95">START THIS TASK</button>
-                    `;
-                    list.appendChild(el);
-                });
-            });
-            // Status/Feedback
-            onSnapshot(query(collection(db, "submissions"), where("userId", "==", auth.currentUser.uid)), (snap) => {
-                const list = document.getElementById('user-subs-list');
-                list.innerHTML = "";
-                snap.forEach(d => {
-                    const s = d.data();
-                    const el = document.createElement('div');
-                    el.className = "bg-white p-6 rounded-3xl shadow-sm border mb-4";
-                    el.innerHTML = `
-                        <div class="flex justify-between mb-4">
-                            <h5 class="font-black text-slate-800">${s.taskTitle}</h5>
-                            <span class="text-[10px] font-black px-3 py-1 rounded-full uppercase ${s.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}">${s.status}</span>
-                        </div>
-                        <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                            <p class="text-[10px] font-black text-blue-400 uppercase mb-2">Admin Feedback</p>
-                            <p class="text-sm text-blue-900 italic font-medium leading-relaxed">${s.adminFeedback || 'Your work is currently under review by our admins.'}</p>
-                        </div>
-                    `;
-                    list.appendChild(el);
-                });
-            });
-        }
-
-        window.openSubmit = (id, title) => {
-            activeTaskId = id;
-            document.getElementById('modal-sub-title').innerText = title;
-            toggleModal('submit-modal', true);
-        };
-
-        document.getElementById('btn-final-submit').onclick = async () => {
-            const btn = document.getElementById('btn-final-submit'), file = document.getElementById('sub-file').files[0], text = document.getElementById('sub-text').value;
-            btn.innerText = "UPLOADING WORK..."; btn.disabled = true;
-            let url = "";
-            if(file) {
-                const sRef = ref(storage, `work/${auth.currentUser.uid}/${Date.now()}_${file.name}`);
-                await uploadBytes(sRef, file);
-                url = await getDownloadURL(sRef);
-            }
-            await addDoc(collection(db, "submissions"), {
-                taskId: activeTaskId, taskTitle: document.getElementById('modal-sub-title').innerText,
-                userId: auth.currentUser.uid, userEmail: auth.currentUser.email || auth.currentUser.phoneNumber,
-                contentText: text, fileUrl: url, status: 'pending', adminFeedback: '', submittedAt: serverTimestamp()
-            });
-            btn.innerText = "SUBMIT FOR REVIEW"; btn.disabled = false;
-            toggleModal('submit-modal', false);
-            alert("Successfully Submitted!");
-        };
-
-        window.toggleModal = (id, show) => document.getElementById(id).classList.toggle('hidden', !show);
     </script>
 </body>
 </html>
