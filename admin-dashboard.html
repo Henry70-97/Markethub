@@ -1,1667 +1,1085 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>NextGen · Admin Dashboard</title>
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
-        body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
-        .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
-        .header { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 2rem; padding: 1rem 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; color: white; }
-        .logo h2 { background: linear-gradient(135deg, #818cf8, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .admin-badge { background: #ef4444; padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.9rem; }
-        .logout-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .stat-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 1.5rem; padding: 1.5rem; color: white; border: 1px solid rgba(255,255,255,0.2); }
-        .stat-card i { font-size: 2rem; color: #818cf8; margin-bottom: 0.5rem; }
-        .stat-value { font-size: 2rem; font-weight: 700; }
-        .tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-        .tab { padding: 0.8rem 1.5rem; border: none; border-radius: 40px; background: rgba(255,255,255,0.1); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; }
-        .tab.active { background: #6366f1; }
-        .content { background: white; border-radius: 2rem; padding: 2rem; min-height: 500px; }
-        .data-table { width: 100%; border-collapse: collapse; }
-        .data-table th { text-align: left; padding: 1rem; background: #f8fafc; }
-        .data-table td { padding: 1rem; border-bottom: 1px solid #e2e8f0; }
-        .badge { padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
-        .badge.success { background: #10b98120; color: #10b981; border: 1px solid #10b981; }
-        .badge.warning { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b; }
-        .badge.danger { background: #ef444420; color: #ef4444; border: 1px solid #ef4444; }
-        .badge.primary { background: #6366f120; color: #6366f1; border: 1px solid #6366f1; }
-        .badge.info { background: #06b6d420; color: #06b6d4; border: 1px solid #06b6d4; }
-        .btn { padding: 0.5rem 1rem; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; margin: 0.2rem; pointer-events: auto; }
-        .btn-primary { background: #6366f1; color: white; }
-        .btn-success { background: #10b981; color: white; }
-        .btn-danger { background: #ef4444; color: white; }
-        .btn-warning { background: #f59e0b; color: white; }
-        .btn-info { background: #06b6d4; color: white; }
-        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 2rem; padding: 2rem; max-width: 500px; width: 90%; z-index: 1000; max-height: 80vh; overflow-y: auto; }
-        .modal.active { display: block; }
-        .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 999; }
-        .modal-backdrop.active { display: block; }
-        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 1rem 2rem; border-radius: 40px; z-index: 2000; display: none; }
-        input, textarea, select { width: 100%; padding: 0.8rem; border: 2px solid #e2e8f0; border-radius: 40px; margin-bottom: 1rem; font-size: 1rem; }
-        textarea { border-radius: 20px; min-height: 100px; }
-        .submission-card { background: #f8fafc; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1rem; }
-        .flex-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-        .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .action-buttons button { position: relative; z-index: 1; }
-        .package-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
-        .package-card { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 1.5rem; padding: 1.5rem; color: white; position: relative; overflow: hidden; }
-        .package-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0)); pointer-events: none; }
-        .package-card .price { font-size: 2.5rem; font-weight: 700; margin: 0.5rem 0; }
-        .package-card .duration { opacity: 0.9; margin-bottom: 1rem; }
-        .package-card .features { list-style: none; margin: 1rem 0; }
-        .package-card .features li { margin: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; }
-        .package-card .features i { color: #34d399; }
-        .membership-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .stat-item { background: #f8fafc; padding: 1rem; border-radius: 1rem; text-align: center; }
-        .stat-item .label { color: #64748b; font-size: 0.9rem; }
-        .stat-item .value { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
-        @media (max-width: 768px) { .header { flex-direction: column; gap: 1rem; text-align: center; } }
-    </style>
-</head>
-<body>
-    <div class="app-container">
-        <div class="header">
-            <div class="logo">
-                <h2>🔷 NextGen Admin</h2>
-            </div>
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <span id="adminName">Loading...</span>
-                <span class="admin-badge">Admin</span>
-                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
-            </div>
-        </div>
-        
-        <div class="stats-grid" id="statsGrid"></div>
-        
-        <div class="tabs">
-            <button class="tab active" data-tab="users">👥 Users</button>
-            <button class="tab" data-tab="tasks">📋 Tasks</button>
-            <button class="tab" data-tab="submissions">📝 Submissions</button>
-            <button class="tab" data-tab="withdrawals">💰 Withdrawals</button>
-            <button class="tab" data-tab="memberships">👑 Memberships</button>
-            <button class="tab" data-tab="messages">💬 Messages</button>
-        </div>
-        
-        <div class="content" id="content"></div>
-    </div>
-    
-    <!-- Modal -->
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal" id="modal">
-        <div id="modalContent"></div>
-        <div class="flex-row" style="justify-content: flex-end; margin-top: 1rem;">
-            <button class="btn btn-danger" id="closeModalBtn">Close</button>
-        </div>
-    </div>
-    
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-    
-    <script>
-        // Firebase Config
-        const firebaseConfig = {
-            apiKey: "AIzaSyChk2JA68-I5s1D0S10r9WK71LgTNi4hRQ",
-            authDomain: "nextgen-5fb6f.firebaseapp.com",
-            projectId: "nextgen-5fb6f",
-            storageBucket: "nextgen-5fb6f.firebasestorage.app",
-            messagingSenderId: "100132076455",
-            appId: "1:100132076455:web:c5aea1f6e1a5ebbea99482"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        
-        let currentUser = null;
-        let currentTab = 'users';
-        let currentMessageType = 'individual'; // 'individual' or 'broadcast'
-        
-        // Check auth state
-        auth.onAuthStateChanged(async (user) => {
-            if (!user) {
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            const doc = await db.collection('users').doc(user.uid).get();
-            if (!doc.exists || doc.data().role !== 'admin') {
-                auth.signOut();
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            if (doc.data().active === false) {
-                auth.signOut();
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            currentUser = user;
-            document.getElementById('adminName').textContent = doc.data().displayName;
-            
-            // Initialize default membership packages if none exist
-            await initializeMembershipPackages();
-            
-            loadDashboard();
-        });
-        
-        // Initialize default membership packages
-        async function initializeMembershipPackages() {
-            try {
-                const packagesSnapshot = await db.collection('membershipPackages').get();
-                
-                if (packagesSnapshot.empty) {
-                    const defaultPackages = [
-                        {
-                            name: 'Basic',
-                            price: 299,
-                            priceKES: 299 * 130,
-                            duration: 'Monthly',
-                            features: [
-                                'Access to basic tasks',
-                                'Earn up to $100/month',
-                                'Standard support',
-                                'Withdrawal once per week'
-                            ],
-                            taskLimit: 10,
-                            withdrawalLimit: 1,
-                            active: true,
-                            color1: '#667eea',
-                            color2: '#764ba2',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        },
-                        {
-                            name: 'Premium',
-                            price: 599,
-                            priceKES: 599 * 130,
-                            duration: 'Monthly',
-                            features: [
-                                'Access to all tasks',
-                                'Earn up to $500/month',
-                                'Priority support',
-                                'Withdrawal twice per week',
-                                'Bonus tasks access'
-                            ],
-                            taskLimit: 30,
-                            withdrawalLimit: 2,
-                            active: true,
-                            color1: '#f093fb',
-                            color2: '#f5576c',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        },
-                        {
-                            name: 'VIP',
-                            price: 999,
-                            priceKES: 999 * 130,
-                            duration: 'Monthly',
-                            features: [
-                                'Unlimited task access',
-                                'Earn up to $1000+/month',
-                                '24/7 VIP support',
-                                'Daily withdrawals',
-                                'Exclusive VIP tasks',
-                                'Higher reward rates'
-                            ],
-                            taskLimit: -1, // Unlimited
-                            withdrawalLimit: 7,
-                            active: true,
-                            color1: '#4facfe',
-                            color2: '#00f2fe',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }
-                    ];
-                    
-                    for (const pkg of defaultPackages) {
-                        await db.collection('membershipPackages').add(pkg);
-                    }
-                    
-                    console.log('Default membership packages created');
-                }
-            } catch (error) {
-                console.error('Error initializing packages:', error);
-            }
-        }
-        
-        // Toast function
-        function showToast(msg, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.style.background = isError ? '#dc2626' : '#0f172a';
-            toast.style.display = 'block';
-            setTimeout(() => toast.style.display = 'none', 3000);
-        }
-        
-        // Modal functions
-        function showModal(html) {
-            document.getElementById('modalContent').innerHTML = html;
-            document.getElementById('modal').classList.add('active');
-            document.getElementById('modalBackdrop').classList.add('active');
-        }
-        
-        function closeModal() {
-            document.getElementById('modal').classList.remove('active');
-            document.getElementById('modalBackdrop').classList.remove('active');
-        }
-        
-        // Logout function
-        function logout() {
-            auth.signOut();
-            window.location.href = 'index.html';
-        }
-        
-        // Tab switching function
-        function switchTab(tab) {
-            currentTab = tab;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-            
-            switch(tab) {
-                case 'users': loadUsers(); break;
-                case 'tasks': loadTasks(); break;
-                case 'submissions': loadSubmissions(); break;
-                case 'withdrawals': loadWithdrawals(); break;
-                case 'memberships': loadMemberships(); break;
-                case 'messages': loadMessages(); break;
-            }
-        }
-        
-        // Load Dashboard Stats
-        async function loadDashboard() {
-            const usersSnapshot = await db.collection('users').get();
-            const tasksSnapshot = await db.collection('tasks').get();
-            
-            const pendingSubs = await db.collection('submissions')
-                .where('status', '==', 'pending')
-                .get();
-            
-            const pendingWithdrawals = await db.collection('withdrawals')
-                .where('status', '==', 'pending')
-                .get();
-            
-            document.getElementById('statsGrid').innerHTML = `
-                <div class="stat-card">
-                    <i class="fas fa-users"></i>
-                    <div class="stat-value">${usersSnapshot.size}</div>
-                    <div class="stat-label">Total Users</div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-tasks"></i>
-                    <div class="stat-value">${tasksSnapshot.size}</div>
-                    <div class="stat-label">Tasks</div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-clock"></i>
-                    <div class="stat-value">${pendingSubs.size}</div>
-                    <div class="stat-label">Pending Reviews</div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-money-bill"></i>
-                    <div class="stat-value">${pendingWithdrawals.size}</div>
-                    <div class="stat-label">Pending Withdrawals</div>
-                </div>
-            `;
-            
-            loadUsers();
-        }
-        
-        // Load Users
-        async function loadUsers() {
-            const snapshot = await db.collection('users').orderBy('createdAt', 'desc').get();
-            
-            let html = '<h3 style="margin-bottom:1.5rem;">User Management</h3>';
-            html += '<table class="data-table">';
-            html += '<tr><th>Email</th><th>Name</th><th>Wallet</th><th>Membership</th><th>Role</th><th>Status</th><th>Actions</th></tr>';
-            
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                html += `
-                    <tr>
-                        <td>${user.email}</td>
-                        <td>${user.displayName}</td>
-                        <td>$${user.wallet || 0}</td>
-                        <td><span class="badge ${user.membershipPaid ? 'success' : 'warning'}">${user.membershipPaid ? (user.membershipType || 'Premium') : 'Free'}</span></td>
-                        <td>${user.role}</td>
-                        <td><span class="badge ${user.active ? 'success' : 'danger'}">${user.active ? 'Active' : 'Inactive'}</span></td>
-                        <td class="action-buttons">
-                            <button class="btn btn-primary toggle-status-btn" data-user-id="${doc.id}" data-new-status="${!user.active}">${user.active ? 'Deactivate' : 'Activate'}</button>
-                            <button class="btn btn-success adjust-wallet-btn" data-user-id="${doc.id}" data-user-name="${user.displayName}" data-wallet="${user.wallet || 0}">Adjust Wallet</button>
-                            ${user.role !== 'admin' ? `<button class="btn btn-warning make-admin-btn" data-user-id="${doc.id}">Make Admin</button>` : ''}
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            html += '</table>';
-            document.getElementById('content').innerHTML = html;
-        }
-        
-        // Toggle User Status
-        async function toggleUserStatus(userId, newStatus) {
-            await db.collection('users').doc(userId).update({ active: newStatus });
-            showToast('User status updated');
-            loadUsers();
-        }
-        
-        // Make Admin
-        async function makeAdmin(userId) {
-            await db.collection('users').doc(userId).update({ role: 'admin' });
-            showToast('User is now admin');
-            loadUsers();
-        }
-        
-        // Show Adjust Wallet Modal
-        function showAdjustWallet(userId, userName, currentWallet) {
-            showModal(`
-                <h3 style="margin-bottom:1rem;">Adjust Wallet - ${userName}</h3>
-                <p>Current Balance: $${currentWallet}</p>
-                <input type="number" id="adjustAmount" placeholder="Amount" step="0.01" min="0">
-                <select id="adjustType">
-                    <option value="add">Add Funds</option>
-                    <option value="subtract">Subtract Funds</option>
-                </select>
-                <textarea id="adjustReason" placeholder="Reason for adjustment (required)"></textarea>
-                <button class="btn btn-primary apply-adjustment-btn" data-user-id="${userId}" style="width:100%;">Apply</button>
-            `);
-        }
-        
-        // Adjust Wallet
-        async function adjustWallet(userId) {
-            const amount = parseFloat(document.getElementById('adjustAmount')?.value);
-            const type = document.getElementById('adjustType')?.value;
-            const reason = document.getElementById('adjustReason')?.value;
-            
-            if (!amount || amount <= 0) {
-                showToast('Please enter a valid amount greater than 0', true);
-                return;
-            }
-            
-            if (!reason || reason.trim() === '') {
-                showToast('Please enter a reason for the adjustment', true);
-                return;
-            }
-            
-            if (!userId) {
-                showToast('User ID is missing', true);
-                return;
-            }
-            
-            const adjustment = type === 'add' ? amount : -amount;
-            
-            try {
-                await db.collection('users').doc(userId).update({
-                    wallet: firebase.firestore.FieldValue.increment(adjustment)
-                });
-                
-                await db.collection('walletAdjustments').add({
-                    userId,
-                    adjustedBy: currentUser.uid,
-                    amount: adjustment,
-                    reason: reason.trim(),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                closeModal();
-                showToast(`Wallet adjusted by $${amount.toFixed(2)}`);
-                loadUsers();
-            } catch (error) {
-                console.error('Error adjusting wallet:', error);
-                showToast('Error adjusting wallet: ' + error.message, true);
-            }
-        }
-        
-        // Load Tasks
-        async function loadTasks() {
-            const snapshot = await db.collection('tasks').orderBy('createdAt', 'desc').get();
-            
-            let html = `
-                <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;">
-                    <h3>Task Management</h3>
-                    <button class="btn btn-primary" id="createTaskBtn">+ New Task</button>
-                </div>
-                <table class="data-table">
-                <tr><th>Title</th><th>Reward</th><th>Category</th><th>Difficulty</th><th>Submissions</th><th>Status</th><th>Actions</th></tr>
-            `;
-            
-            snapshot.forEach(doc => {
-                const task = doc.data();
-                html += `
-                    <tr>
-                        <td>${task.title}</td>
-                        <td>$${task.reward}</td>
-                        <td>${task.category}</td>
-                        <td>${task.difficulty}</td>
-                        <td>${task.submissionsCount || 0}</td>
-                        <td><span class="badge ${task.active ? 'success' : 'danger'}">${task.active ? 'Active' : 'Inactive'}</span></td>
-                        <td class="action-buttons">
-                            <button class="btn btn-primary edit-task-btn" data-task-id="${doc.id}">Edit</button>
-                            <button class="btn btn-warning toggle-task-btn" data-task-id="${doc.id}" data-new-status="${!task.active}">${task.active ? 'Deactivate' : 'Activate'}</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            html += '</table>';
-            document.getElementById('content').innerHTML = html;
-        }
-        
-        // Show Create Task Modal
-        function showCreateTask() {
-            showModal(`
-                <h3 style="margin-bottom:1rem;">Create New Task</h3>
-                <input type="text" id="taskTitle" placeholder="Title">
-                <textarea id="taskDescription" placeholder="Description"></textarea>
-                <input type="number" id="taskReward" placeholder="Reward (USD)">
-                <select id="taskCategory">
-                    <option value="writing">Writing</option>
-                    <option value="design">Design</option>
-                    <option value="development">Development</option>
-                    <option value="marketing">Marketing</option>
-                    <option value="other">Other</option>
-                </select>
-                <select id="taskDifficulty">
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                </select>
-                <button class="btn btn-primary" id="createTaskConfirmBtn" style="width:100%;">Create</button>
-            `);
-        }
-        
-        // Create Task
-        async function createTask() {
-            const title = document.getElementById('taskTitle').value;
-            const description = document.getElementById('taskDescription').value;
-            const reward = parseFloat(document.getElementById('taskReward').value);
-            const category = document.getElementById('taskCategory').value;
-            const difficulty = document.getElementById('taskDifficulty').value;
-            
-            if (!title || !description || !reward) {
-                showToast('Fill all fields', true);
-                return;
-            }
-            
-            await db.collection('tasks').add({
-                title,
-                description,
-                reward,
-                rewardKES: reward * 130,
-                category,
-                difficulty,
-                active: true,
-                submissionsCount: 0,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            closeModal();
-            showToast('Task created');
-            loadTasks();
-        }
-        
-        // Toggle Task
-        async function toggleTask(taskId, newStatus) {
-            await db.collection('tasks').doc(taskId).update({ active: newStatus });
-            showToast('Task updated');
-            loadTasks();
-        }
-        
-        // Edit Task
-        async function editTask(taskId) {
-            const task = await db.collection('tasks').doc(taskId).get();
-            const data = task.data();
-            
-            showModal(`
-                <h3 style="margin-bottom:1rem;">Edit Task</h3>
-                <input type="text" id="editTitle" value="${data.title}">
-                <textarea id="editDescription">${data.description}</textarea>
-                <input type="number" id="editReward" value="${data.reward}">
-                <select id="editCategory">
-                    <option value="writing" ${data.category === 'writing' ? 'selected' : ''}>Writing</option>
-                    <option value="design" ${data.category === 'design' ? 'selected' : ''}>Design</option>
-                    <option value="development" ${data.category === 'development' ? 'selected' : ''}>Development</option>
-                    <option value="marketing" ${data.category === 'marketing' ? 'selected' : ''}>Marketing</option>
-                    <option value="other" ${data.category === 'other' ? 'selected' : ''}>Other</option>
-                </select>
-                <select id="editDifficulty">
-                    <option value="easy" ${data.difficulty === 'easy' ? 'selected' : ''}>Easy</option>
-                    <option value="medium" ${data.difficulty === 'medium' ? 'selected' : ''}>Medium</option>
-                    <option value="hard" ${data.difficulty === 'hard' ? 'selected' : ''}>Hard</option>
-                </select>
-                <button class="btn btn-primary" id="updateTaskBtn" data-task-id="${taskId}" style="width:100%;">Update</button>
-            `);
-        }
-        
-        // Update Task
-        async function updateTask(taskId) {
-            const title = document.getElementById('editTitle').value;
-            const description = document.getElementById('editDescription').value;
-            const reward = parseFloat(document.getElementById('editReward').value);
-            const category = document.getElementById('editCategory').value;
-            const difficulty = document.getElementById('editDifficulty').value;
-            
-            await db.collection('tasks').doc(taskId).update({
-                title,
-                description,
-                reward,
-                rewardKES: reward * 130,
-                category,
-                difficulty
-            });
-            
-            closeModal();
-            showToast('Task updated');
-            loadTasks();
-        }
-        
-        // Load Submissions
-        async function loadSubmissions() {
-            const snapshot = await db.collection('submissions')
-                .where('status', '==', 'pending')
-                .get();
-            
-            let html = '<h3 style="margin-bottom:1.5rem;">Pending Submissions</h3>';
-            
-            if (snapshot.empty) {
-                html += '<p>No pending submissions.</p>';
-            } else {
-                snapshot.forEach(doc => {
-                    const sub = doc.data();
-                    html += `
-                        <div class="submission-card" data-sub-id="${doc.id}">
-                            <h4>${sub.taskTitle}</h4>
-                            <p><strong>User:</strong> ${sub.userEmail}</p>
-                            <p><strong>Work:</strong> ${sub.workText}</p>
-                            <div class="flex-row" style="margin:1rem 0;">
-                                <input type="number" class="submission-score" placeholder="Score (0-100)" min="0" max="100" style="width:120px;">
-                                <textarea class="submission-review" placeholder="Feedback" style="flex:1;"></textarea>
-                            </div>
-                            <div class="flex-row">
-                                <button class="btn btn-success approve-submission" data-sub-id="${doc.id}">Approve</button>
-                                <button class="btn btn-danger reject-submission" data-sub-id="${doc.id}">Reject</button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            
-            document.getElementById('content').innerHTML = html;
-        }
-        
-        // Review Submission
-        async function reviewSubmission(subId, approved) {
-            const submissionCard = document.querySelector(`[data-sub-id="${subId}"]`);
-            const score = parseInt(submissionCard.querySelector('.submission-score')?.value || 0);
-            const review = submissionCard.querySelector('.submission-review')?.value || '';
-            
-            if (approved && (!score || score < 0 || score > 100)) {
-                showToast('Enter valid score (0-100)', true);
-                return;
-            }
-            
-            const subDoc = await db.collection('submissions').doc(subId).get();
-            const sub = subDoc.data();
-            
-            const taskDoc = await db.collection('tasks').doc(sub.taskId).get();
-            const task = taskDoc.data();
-            
-            let earned = 0;
-            let status = approved ? 'approved' : 'rejected';
-            
-            if (approved && score >= 50) {
-                earned = (task.reward * score) / 100;
-                
-                await db.collection('users').doc(sub.userId).update({
-                    wallet: firebase.firestore.FieldValue.increment(earned),
-                    totalEarned: firebase.firestore.FieldValue.increment(earned),
-                    tasksCompleted: firebase.firestore.FieldValue.increment(1)
-                });
-            } else if (approved && score < 50) {
-                status = 'rejected';
-            }
-            
-            await db.collection('submissions').doc(subId).update({
-                status,
-                score: approved ? score : 0,
-                review,
-                earned,
-                reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            showToast(`Submission ${status}${earned > 0 ? ' - $' + earned : ''}`);
-            loadSubmissions();
-        }
-        
-        // Load Withdrawals
-        async function loadWithdrawals() {
-            const snapshot = await db.collection('withdrawals')
-                .where('status', '==', 'pending')
-                .get();
-            
-            let html = '<h3 style="margin-bottom:1.5rem;">Pending Withdrawals</h3>';
-            
-            if (snapshot.empty) {
-                html += '<p>No pending withdrawals.</p>';
-            } else {
-                snapshot.forEach(doc => {
-                    const w = doc.data();
-                    html += `
-                        <div class="submission-card">
-                            <p><strong>User:</strong> ${w.userEmail}</p>
-                            <p><strong>Amount:</strong> $${w.amount} (KES ${w.amountKES})</p>
-                            <p><strong>Method:</strong> ${w.method} - ${w.phone}</p>
-                            <p><strong>Requested:</strong> ${w.requestedAt?.toDate().toLocaleString()}</p>
-                            <button class="btn btn-success process-withdrawal" data-withdrawal-id="${doc.id}">Mark as Paid</button>
-                        </div>
-                    `;
-                });
-            }
-            
-            document.getElementById('content').innerHTML = html;
-        }
-        
-        // Process Withdrawal
-        async function processWithdrawal(withdrawalId) {
-            await db.collection('withdrawals').doc(withdrawalId).update({
-                status: 'paid',
-                paidAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            showToast('Withdrawal marked as paid');
-            loadWithdrawals();
-        }
-        
-        // Load Memberships (with package management)
-        async function loadMemberships() {
-            try {
-                // Get membership packages
-                const packagesSnapshot = await db.collection('membershipPackages')
-                    .orderBy('price', 'asc')
-                    .get();
-                
-                // Get pending payments
-                const pendingSnapshot = await db.collection('membershipPayments')
-                    .where('status', '==', 'pending')
-                    .orderBy('submittedAt', 'desc')
-                    .get();
-                
-                // Get membership stats
-                const totalMembers = await db.collection('users')
-                    .where('membershipPaid', '==', 'true')
-                    .get();
-                
-                const totalRevenue = await db.collection('membershipPayments')
-                    .where('status', '==', 'approved')
-                    .get();
-                
-                let totalAmount = 0;
-                totalRevenue.forEach(doc => {
-                    totalAmount += doc.data().amount || 0;
-                });
-                
-                let html = `
-                    <h3 style="margin-bottom:1.5rem;">Membership Management</h3>
-                    
-                    <!-- Membership Stats -->
-                    <div class="membership-stats">
-                        <div class="stat-item">
-                            <div class="label">Active Members</div>
-                            <div class="value">${totalMembers.size}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="label">Pending Approvals</div>
-                            <div class="value">${pendingSnapshot.size}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="label">Total Revenue</div>
-                            <div class="value">$${totalAmount.toFixed(2)}</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Package Management -->
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin: 2rem 0 1rem;">
-                        <h4>Membership Packages</h4>
-                        <button class="btn btn-primary" id="createPackageBtn">
-                            <i class="fas fa-plus"></i> New Package
-                        </button>
-                    </div>
-                    
-                    <div class="package-grid">
-                `;
-                
-                // Display packages
-                if (packagesSnapshot.empty) {
-                    html += '<p>No packages found. Create your first package!</p>';
-                } else {
-                    packagesSnapshot.forEach(doc => {
-                        const pkg = doc.data();
-                        html += `
-                            <div class="package-card" style="background: linear-gradient(135deg, ${pkg.color1 || '#667eea'}, ${pkg.color2 || '#764ba2'});">
-                                <div style="display:flex; justify-content:space-between; align-items:start;">
-                                    <h3>${pkg.name}</h3>
-                                    <span class="badge ${pkg.active ? 'success' : 'danger'}" style="background: rgba(255,255,255,0.2); color: white; border: none;">
-                                        ${pkg.active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </div>
-                                <div class="price">$${pkg.price}</div>
-                                <div class="duration">${pkg.duration}</div>
-                                <div style="margin: 1rem 0;">
-                                    <small style="opacity:0.8;">KES ${pkg.priceKES || pkg.price * 130}</small>
-                                </div>
-                                <ul class="features">
-                                    ${pkg.features ? pkg.features.map(f => `<li><i class="fas fa-check-circle"></i> ${f}</li>`).join('') : ''}
-                                </ul>
-                                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-                                    <button class="btn btn-info edit-package-btn" data-package-id="${doc.id}" style="flex:1; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Edit</button>
-                                    <button class="btn toggle-package-btn" data-package-id="${doc.id}" data-new-status="${!pkg.active}" style="flex:1; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">
-                                        ${pkg.active ? 'Deactivate' : 'Activate'}
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-                
-                html += `</div>`;
-                
-                // Pending Payments Section
-                html += `
-                    <h4 style="margin: 2rem 0 1rem;">Pending Membership Approvals</h4>
-                `;
-                
-                if (pendingSnapshot.empty) {
-                    html += '<p>No pending membership approvals.</p>';
-                } else {
-                    pendingSnapshot.forEach(doc => {
-                        const p = doc.data();
-                        html += `
-                            <div class="submission-card">
-                                <div style="display:flex; justify-content:space-between; align-items:start;">
-                                    <div>
-                                        <h4>${p.userEmail}</h4>
-                                        <p><strong>Package:</strong> ${p.packageName || 'Premium'}</p>
-                                        <p><strong>Amount:</strong> $${p.amount} (KES ${p.amountKES})</p>
-                                        <p><strong>Transaction:</strong> ${p.transactionCode}</p>
-                                        <p><strong>Phone:</strong> ${p.phoneNumber}</p>
-                                        <p><small>Submitted: ${p.submittedAt?.toDate().toLocaleString()}</small></p>
-                                    </div>
-                                </div>
-                                <div class="flex-row" style="margin-top:1rem;">
-                                    <button class="btn btn-success approve-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
-                                        <i class="fas fa-check"></i> Approve
-                                    </button>
-                                    <button class="btn btn-danger reject-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
-                                    <button class="btn btn-info view-user-details" data-user-id="${p.userId}">
-                                        <i class="fas fa-user"></i> View User
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-                
-                document.getElementById('content').innerHTML = html;
-            } catch (error) {
-                console.error('Error loading memberships:', error);
-                showToast('Error loading memberships: ' + error.message, true);
-            }
-        }
-        
-        // Show Create Package Modal
-        function showCreatePackage() {
-            showModal(`
-                <h3 style="margin-bottom:1rem;">Create Membership Package</h3>
-                <input type="text" id="packageName" placeholder="Package Name (e.g., Premium)">
-                <input type="number" id="packagePrice" placeholder="Price (USD)" step="0.01" min="0">
-                <select id="packageDuration">
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Yearly">Yearly</option>
-                    <option value="Lifetime">Lifetime</option>
-                </select>
-                <input type="number" id="packageTaskLimit" placeholder="Task Limit per day (-1 for unlimited)" step="1" min="-1">
-                <input type="number" id="packageWithdrawalLimit" placeholder="Withdrawals per week" step="1" min="1">
-                <div style="margin-bottom:1rem;">
-                    <label>Features (one per line)</label>
-                    <textarea id="packageFeatures" placeholder="Enter features, one per line&#10;Example:&#10;Access to all tasks&#10;Priority support&#10;Daily withdrawals" style="min-height:100px;"></textarea>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <input type="color" id="packageColor1" value="#667eea" style="flex:1; height:40px;">
-                    <input type="color" id="packageColor2" value="#764ba2" style="flex:1; height:40px;">
-                </div>
-                <button class="btn btn-primary" id="createPackageConfirmBtn" style="width:100%; margin-top:1rem;">Create Package</button>
-            `);
-        }
-        
-        // Create Package
-        async function createPackage() {
-            try {
-                const name = document.getElementById('packageName').value;
-                const price = parseFloat(document.getElementById('packagePrice').value);
-                const duration = document.getElementById('packageDuration').value;
-                const taskLimit = parseInt(document.getElementById('packageTaskLimit').value);
-                const withdrawalLimit = parseInt(document.getElementById('packageWithdrawalLimit').value);
-                const featuresText = document.getElementById('packageFeatures').value;
-                const color1 = document.getElementById('packageColor1').value;
-                const color2 = document.getElementById('packageColor2').value;
-                
-                if (!name || !price) {
-                    showToast('Please fill required fields', true);
-                    return;
-                }
-                
-                const features = featuresText.split('\n').filter(f => f.trim() !== '');
-                
-                await db.collection('membershipPackages').add({
-                    name,
-                    price,
-                    priceKES: price * 130,
-                    duration,
-                    taskLimit,
-                    withdrawalLimit,
-                    features,
-                    color1,
-                    color2,
-                    active: true,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                closeModal();
-                showToast('Package created successfully');
-                loadMemberships();
-            } catch (error) {
-                console.error('Error creating package:', error);
-                showToast('Error creating package: ' + error.message, true);
-            }
-        }
-        
-        // Show Edit Package Modal
-        async function showEditPackage(packageId) {
-            try {
-                const packageDoc = await db.collection('membershipPackages').doc(packageId).get();
-                if (!packageDoc.exists) {
-                    showToast('Package not found', true);
-                    return;
-                }
-                const pkg = packageDoc.data();
-                
-                showModal(`
-                    <h3 style="margin-bottom:1rem;">Edit Package - ${pkg.name}</h3>
-                    <input type="text" id="editPackageName" value="${pkg.name}" placeholder="Package Name">
-                    <input type="number" id="editPackagePrice" value="${pkg.price}" step="0.01" min="0">
-                    <select id="editPackageDuration">
-                        <option value="Monthly" ${pkg.duration === 'Monthly' ? 'selected' : ''}>Monthly</option>
-                        <option value="Quarterly" ${pkg.duration === 'Quarterly' ? 'selected' : ''}>Quarterly</option>
-                        <option value="Yearly" ${pkg.duration === 'Yearly' ? 'selected' : ''}>Yearly</option>
-                        <option value="Lifetime" ${pkg.duration === 'Lifetime' ? 'selected' : ''}>Lifetime</option>
-                    </select>
-                    <input type="number" id="editPackageTaskLimit" value="${pkg.taskLimit || 10}" placeholder="Task Limit per day">
-                    <input type="number" id="editPackageWithdrawalLimit" value="${pkg.withdrawalLimit || 1}" placeholder="Withdrawals per week">
-                    <div style="margin-bottom:1rem;">
-                        <label>Features (one per line)</label>
-                        <textarea id="editPackageFeatures" style="min-height:100px;">${pkg.features ? pkg.features.join('\n') : ''}</textarea>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="color" id="editPackageColor1" value="${pkg.color1 || '#667eea'}" style="flex:1; height:40px;">
-                        <input type="color" id="editPackageColor2" value="${pkg.color2 || '#764ba2'}" style="flex:1; height:40px;">
-                    </div>
-                    <button class="btn btn-primary" id="updatePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:1rem;">Update Package</button>
-                    <button class="btn btn-danger" id="deletePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:0.5rem;">Delete Package</button>
-                `);
-            } catch (error) {
-                console.error('Error showing edit package:', error);
-                showToast('Error loading package details', true);
-            }
-        }
-        
-        // Update Package
-        async function updatePackage(packageId) {
-            try {
-                const name = document.getElementById('editPackageName').value;
-                const price = parseFloat(document.getElementById('editPackagePrice').value);
-                const duration = document.getElementById('editPackageDuration').value;
-                const taskLimit = parseInt(document.getElementById('editPackageTaskLimit').value);
-                const withdrawalLimit = parseInt(document.getElementById('editPackageWithdrawalLimit').value);
-                const featuresText = document.getElementById('editPackageFeatures').value;
-                const color1 = document.getElementById('editPackageColor1').value;
-                const color2 = document.getElementById('editPackageColor2').value;
-                
-                if (!name || !price) {
-                    showToast('Please fill required fields', true);
-                    return;
-                }
-                
-                const features = featuresText.split('\n').filter(f => f.trim() !== '');
-                
-                await db.collection('membershipPackages').doc(packageId).update({
-                    name,
-                    price,
-                    priceKES: price * 130,
-                    duration,
-                    taskLimit,
-                    withdrawalLimit,
-                    features,
-                    color1,
-                    color2,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                closeModal();
-                showToast('Package updated successfully');
-                loadMemberships();
-            } catch (error) {
-                console.error('Error updating package:', error);
-                showToast('Error updating package: ' + error.message, true);
-            }
-        }
-        
-        // Toggle Package Status
-        async function togglePackage(packageId, newStatus) {
-            try {
-                await db.collection('membershipPackages').doc(packageId).update({
-                    active: newStatus
-                });
-                showToast(`Package ${newStatus ? 'activated' : 'deactivated'}`);
-                loadMemberships();
-            } catch (error) {
-                console.error('Error toggling package:', error);
-                showToast('Error updating package status', true);
-            }
-        }
-        
-        // Delete Package
-        async function deletePackage(packageId) {
-            if (confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
-                try {
-                    await db.collection('membershipPackages').doc(packageId).delete();
-                    closeModal();
-                    showToast('Package deleted');
-                    loadMemberships();
-                } catch (error) {
-                    console.error('Error deleting package:', error);
-                    showToast('Error deleting package', true);
-                }
-            }
-        }
-        
-        // Approve Membership
-        async function approveMembership(userId, paymentId) {
-            try {
-                showToast('Processing approval...');
-                
-                // Get payment details to know which package
-                const paymentDoc = await db.collection('membershipPayments').doc(paymentId).get();
-                if (!paymentDoc.exists) {
-                    showToast('Payment record not found', true);
-                    return;
-                }
-                const payment = paymentDoc.data();
-                
-                // Update user membership
-                await db.collection('users').doc(userId).update({
-                    membershipPaid: true,
-                    membershipStatus: 'approved',
-                    membershipType: payment.packageName || 'Premium',
-                    membershipExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                // Update payment status
-                await db.collection('membershipPayments').doc(paymentId).update({
-                    status: 'approved',
-                    approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    approvedBy: currentUser.uid
-                });
-                
-                showToast('✅ Membership approved successfully');
-                loadMemberships(); // Reload the memberships tab
-                
-            } catch (error) {
-                console.error('Error approving membership:', error);
-                showToast('Error approving membership: ' + error.message, true);
-            }
-        }
-        
-        // Reject Membership
-        async function rejectMembership(userId, paymentId) {
-            try {
-                showToast('Processing rejection...');
-                
-                // Update user membership status
-                await db.collection('users').doc(userId).update({
-                    membershipStatus: 'rejected',
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                // Update payment status
-                await db.collection('membershipPayments').doc(paymentId).update({
-                    status: 'rejected',
-                    rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    rejectedBy: currentUser.uid
-                });
-                
-                showToast('Membership rejected');
-                loadMemberships(); // Reload the memberships tab
-                
-            } catch (error) {
-                console.error('Error rejecting membership:', error);
-                showToast('Error rejecting membership: ' + error.message, true);
-            }
-        }
-        
-        // View User Details
-        async function viewUserDetails(userId) {
-            try {
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (!userDoc.exists) {
-                    showToast('User not found', true);
-                    return;
-                }
-                
-                const user = userDoc.data();
-                
-                // Get user's payment history
-                const paymentsSnapshot = await db.collection('membershipPayments')
-                    .where('userId', '==', userId)
-                    .orderBy('submittedAt', 'desc')
-                    .limit(5)
-                    .get();
-                
-                let paymentsHtml = '';
-                paymentsSnapshot.forEach(doc => {
-                    const payment = doc.data();
-                    paymentsHtml += `
-                        <div style="background: #f8fafc; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 0.5rem;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span><strong>$${payment.amount}</strong></span>
-                                <span class="badge ${payment.status === 'approved' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger'}">${payment.status}</span>
-                            </div>
-                            <small>${payment.submittedAt?.toDate().toLocaleString()}</small>
-                        </div>
-                    `;
-                });
-                
-                showModal(`
-                    <h3 style="margin-bottom:1rem;">User Details</h3>
-                    <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1rem;">
-                        <h4>${user.displayName || 'N/A'}</h4>
-                        <p>${user.email}</p>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div style="background: #f8fafc; padding: 1rem; border-radius: 0.5rem; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700;">$${user.wallet || 0}</div>
-                            <div style="color: #64748b;">Wallet Balance</div>
-                        </div>
-                        <div style="background: #f8fafc; padding: 1rem; border-radius: 0.5rem; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700;">${user.tasksCompleted || 0}</div>
-                            <div style="color: #64748b;">Tasks Done</div>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Membership:</strong> 
-                        <span class="badge ${user.membershipPaid ? 'success' : 'warning'}">
-                            ${user.membershipPaid ? (user.membershipType || 'Premium') : 'Free'}
-                        </span>
-                    </div>
-                    
-                    ${paymentsHtml ? `
-                        <div style="margin-top: 1rem;">
-                            <strong>Recent Payments:</strong>
-                            <div style="margin-top: 0.5rem;">${paymentsHtml}</div>
-                        </div>
-                    ` : ''}
-                    
-                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                        <button class="btn btn-primary" onclick="closeModal()" style="flex: 1;">Close</button>
-                        <button class="btn btn-success" onclick="showAdjustWallet('${userId}', '${user.displayName || user.email}', ${user.wallet || 0})" style="flex: 1;">
-                            Adjust Wallet
-                        </button>
-                    </div>
-                `);
-            } catch (error) {
-                console.error('Error viewing user details:', error);
-                showToast('Error loading user details', true);
-            }
-        }
-        
-        // Load Messages (with broadcast feature)
-        async function loadMessages() {
-            try {
-                const users = await db.collection('users').get();
-                
-                let options = '<option value="">Select User</option>';
-                users.forEach(doc => {
-                    const user = doc.data();
-                    options += `<option value="${doc.id}">${user.email} - ${user.displayName}</option>`;
-                });
-                
-                const messages = await db.collection('messages')
-                    .orderBy('createdAt', 'desc')
-                    .limit(20)
-                    .get();
-                
-                let messagesHtml = '';
-                messages.forEach(doc => {
-                    const msg = doc.data();
-                    const isBroadcast = msg.userId === 'ALL_USERS' || msg.isBroadcast;
-                    messagesHtml += `
-                        <div class="submission-card" style="border-left: 4px solid ${isBroadcast ? '#6366f1' : '#10b981'}">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <strong style="color: ${isBroadcast ? '#6366f1' : '#10b981'}">
-                                    ${isBroadcast ? '📢 Broadcast to All Users' : `👤 To: ${msg.userEmail || msg.userId}`}
-                                </strong>
-                                <small>${msg.createdAt?.toDate().toLocaleString()}</small>
-                            </div>
-                            ${msg.title ? `<h4 style="margin: 0.5rem 0; color: #1f2937;">${msg.title}</h4>` : ''}
-                            <p style="margin: 0.5rem 0;">${msg.message}</p>
-                            ${msg.sentCount ? `<small style="color: #6b7280;">✓ Delivered to ${msg.sentCount} users</small>` : ''}
-                        </div>
-                    `;
-                });
-                
-                let html = `
-                    <h3 style="margin-bottom:1.5rem;">Message Center</h3>
-                    
-                    <!-- Toggle between individual and broadcast -->
-                    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                        <button class="btn ${currentMessageType === 'individual' ? 'btn-primary' : 'btn'}" id="individualMessageBtn">📨 Individual Message</button>
-                        <button class="btn ${currentMessageType === 'broadcast' ? 'btn-primary' : 'btn'}" id="broadcastMessageBtn">📢 Broadcast to All</button>
-                    </div>
-                    
-                    <!-- Individual Message Form -->
-                    <div id="individualMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'individual' ? 'block' : 'none'};">
-                        <h4 style="margin-bottom:1rem;">Send Individual Message</h4>
-                        <select id="messageUser">${options}</select>
-                        <textarea id="messageText" placeholder="Type your message..."></textarea>
-                        <button class="btn btn-primary" id="sendMessageBtn">Send Message</button>
-                    </div>
-                    
-                    <!-- Broadcast Message Form -->
-                    <div id="broadcastMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'broadcast' ? 'block' : 'none'};">
-                        <h4 style="margin-bottom:1rem; color: #6366f1;">Send Broadcast to All Users</h4>
-                        <div style="background: #6366f120; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                            <p style="margin: 0;"><strong>⚠️ Important:</strong> This message will be sent to ALL registered users (${users.size} users total).</p>
-                        </div>
-                        <input type="text" id="broadcastTitle" placeholder="Message Title (Optional)">
-                        <textarea id="broadcastMessage" placeholder="Type your broadcast message..." style="min-height: 120px;"></textarea>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-primary" id="sendBroadcastBtn" style="flex: 1;">
-                                <i class="fas fa-bullhorn"></i> Send Broadcast to All Users
-                            </button>
-                            <button class="btn" id="previewBroadcastBtn">
-                                <i class="fas fa-eye"></i> Preview
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Recent Messages -->
-                    <h4 style="margin-bottom:1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <span>Recent Messages</span>
-                        <span class="badge primary">${messages.size} messages</span>
-                    </h4>
-                    ${messagesHtml || '<p style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 1rem;">No messages yet</p>'}
-                `;
-                
-                document.getElementById('content').innerHTML = html;
-            } catch (error) {
-                console.error('Error loading messages:', error);
-                showToast('Error loading messages', true);
-            }
-        }
-        
-        // Send Individual Message
-        async function sendMessage() {
-            try {
-                const userId = document.getElementById('messageUser').value;
-                const message = document.getElementById('messageText').value;
-                
-                if (!userId) {
-                    showToast('Please select a user', true);
-                    return;
-                }
-                
-                if (!message) {
-                    showToast('Enter message', true);
-                    return;
-                }
-                
-                // Get user email for display
-                const userDoc = await db.collection('users').doc(userId).get();
-                const userEmail = userDoc.data().email;
-                
-                await db.collection('messages').add({
-                    userId,
-                    userEmail,
-                    message,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                showToast('Message sent');
-                document.getElementById('messageText').value = '';
-                loadMessages();
-            } catch (error) {
-                console.error('Error sending message:', error);
-                showToast('Error sending message', true);
-            }
-        }
-        
-        // Send Broadcast Message
-        async function sendBroadcast() {
-            const title = document.getElementById('broadcastTitle')?.value || '';
-            const message = document.getElementById('broadcastMessage')?.value;
-            
-            if (!message || message.trim() === '') {
-                showToast('Please enter a message', true);
-                return;
-            }
-            
-            // Show confirmation modal
-            showModal(`
-                <h3 style="margin-bottom:1rem; color: #6366f1;">Confirm Broadcast</h3>
-                <div style="background: #6366f120; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                    <p><strong>⚠️ You are about to send a message to ALL users</strong></p>
-                    <p>This action cannot be undone. Please review your message:</p>
-                </div>
-                
-                ${title ? `<p><strong>Title:</strong> ${title}</p>` : ''}
-                <p><strong>Message:</strong></p>
-                <div style="background: #f8fafc; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;">
-                    ${message}
-                </div>
-                
-                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button class="btn btn-success" id="confirmBroadcastBtn" style="flex: 1;">
-                        <i class="fas fa-check"></i> Yes, Send to All Users
-                    </button>
-                    <button class="btn btn-danger" id="cancelBroadcastBtn" style="flex: 1;">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                </div>
-            `);
-        }
-        
-        // Execute Broadcast
-        async function executeBroadcast() {
-            const title = document.getElementById('broadcastTitle')?.value || '';
-            const message = document.getElementById('broadcastMessage')?.value;
-            
-            closeModal();
-            showToast('Preparing broadcast...');
-            
-            try {
-                // Get all users
-                const usersSnapshot = await db.collection('users').get();
-                const sentCount = usersSnapshot.size;
-                
-                // Create broadcast message in Firestore
-                await db.collection('messages').add({
-                    userId: 'ALL_USERS',
-                    isBroadcast: true,
-                    title: title,
-                    message: message,
-                    sentCount: sentCount,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    sentBy: currentUser.uid
-                });
-                
-                // Create notifications for all users
-                const batch = db.batch();
-                usersSnapshot.docs.forEach((userDoc) => {
-                    const notifRef = db.collection('notifications').doc();
-                    batch.set(notifRef, {
-                        userId: userDoc.id,
-                        type: 'broadcast',
-                        title: title || 'New Announcement',
-                        message: message,
-                        read: false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                });
-                
-                // Commit batch
-                await batch.commit();
-                
-                showToast(`✅ Broadcast sent to ${sentCount} users!`);
-                
-                // Clear form
-                document.getElementById('broadcastMessage').value = '';
-                if (document.getElementById('broadcastTitle')) {
-                    document.getElementById('broadcastTitle').value = '';
-                }
-                
-                // Reload messages
-                loadMessages();
-                
-            } catch (error) {
-                console.error('Broadcast error:', error);
-                showToast('Error sending broadcast: ' + error.message, true);
-            }
-        }
-        
-        // Preview Broadcast
-        function previewBroadcast() {
-            const title = document.getElementById('broadcastTitle')?.value || '';
-            const message = document.getElementById('broadcastMessage')?.value;
-            
-            if (!message) {
-                showToast('Enter a message to preview', true);
-                return;
-            }
-            
-            showModal(`
-                <h3 style="margin-bottom:1rem;">Broadcast Preview</h3>
-                <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 2rem; border-radius: 1rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                        <i class="fas fa-bullhorn" style="font-size: 1.5rem;"></i>
-                        <span style="font-weight: 600;">Admin Announcement</span>
-                    </div>
-                    ${title ? `<h4 style="margin-bottom: 0.5rem;">${title}</h4>` : ''}
-                    <p style="margin: 0; opacity: 0.95;">${message}</p>
-                    <div style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.7;">
-                        — NextGen Admin
-                    </div>
-                </div>
-                <p style="margin-top: 1rem; color: #6b7280;">This is how users will see your broadcast message.</p>
-                <button class="btn btn-primary" onclick="closeModal()" style="width: 100%;">Close Preview</button>
-            `);
-        }
-        
-        // Event Delegation for all buttons
-        document.addEventListener('click', async (e) => {
-            const target = e.target;
-            
-            // Logout button
-            if (target.id === 'logoutBtn' || target.closest('#logoutBtn')) {
-                logout();
-                return;
-            }
-            
-            // Tab buttons
-            if (target.classList.contains('tab') || target.closest('.tab')) {
-                const tab = target.closest('.tab') || target;
-                const tabName = tab.getAttribute('data-tab');
-                if (tabName) {
-                    switchTab(tabName);
-                }
-                return;
-            }
-            
-            // Close modal button
-            if (target.id === 'closeModalBtn' || target.closest('#closeModalBtn') || target.classList.contains('modal-backdrop')) {
-                closeModal();
-                return;
-            }
-            
-            // Adjust Wallet button
-            if (target.classList.contains('adjust-wallet-btn')) {
-                const userId = target.getAttribute('data-user-id');
-                const userName = target.getAttribute('data-user-name');
-                const wallet = target.getAttribute('data-wallet');
-                showAdjustWallet(userId, userName, parseFloat(wallet || 0));
-                return;
-            }
-            
-            // Apply Adjustment button (inside modal)
-            if (target.classList.contains('apply-adjustment-btn')) {
-                const userId = target.getAttribute('data-user-id');
-                await adjustWallet(userId);
-                return;
-            }
-            
-            // Toggle User Status
-            if (target.classList.contains('toggle-status-btn')) {
-                const userId = target.getAttribute('data-user-id');
-                const newStatus = target.getAttribute('data-new-status') === 'true';
-                await toggleUserStatus(userId, newStatus);
-                return;
-            }
-            
-            // Make Admin
-            if (target.classList.contains('make-admin-btn')) {
-                const userId = target.getAttribute('data-user-id');
-                await makeAdmin(userId);
-                return;
-            }
-            
-            // Create Task button
-            if (target.id === 'createTaskBtn') {
-                showCreateTask();
-                return;
-            }
-            
-            // Create Task Confirm button
-            if (target.id === 'createTaskConfirmBtn') {
-                await createTask();
-                return;
-            }
-            
-            // Edit Task button
-            if (target.classList.contains('edit-task-btn')) {
-                const taskId = target.getAttribute('data-task-id');
-                await editTask(taskId);
-                return;
-            }
-            
-            // Update Task button
-            if (target.id === 'updateTaskBtn') {
-                const taskId = target.getAttribute('data-task-id');
-                await updateTask(taskId);
-                return;
-            }
-            
-            // Toggle Task button
-            if (target.classList.contains('toggle-task-btn')) {
-                const taskId = target.getAttribute('data-task-id');
-                const newStatus = target.getAttribute('data-new-status') === 'true';
-                await toggleTask(taskId, newStatus);
-                return;
-            }
-            
-            // Approve Submission
-            if (target.classList.contains('approve-submission')) {
-                const subId = target.getAttribute('data-sub-id');
-                await reviewSubmission(subId, true);
-                return;
-            }
-            
-            // Reject Submission
-            if (target.classList.contains('reject-submission')) {
-                const subId = target.getAttribute('data-sub-id');
-                await reviewSubmission(subId, false);
-                return;
-            }
-            
-            // Process Withdrawal
-            if (target.classList.contains('process-withdrawal')) {
-                const withdrawalId = target.getAttribute('data-withdrawal-id');
-                await processWithdrawal(withdrawalId);
-                return;
-            }
-            
-            // Create Package button
-            if (target.id === 'createPackageBtn') {
-                showCreatePackage();
-                return;
-            }
-            
-            // Create Package Confirm button
-            if (target.id === 'createPackageConfirmBtn') {
-                await createPackage();
-                return;
-            }
-            
-            // Edit Package button
-            if (target.classList.contains('edit-package-btn')) {
-                const packageId = target.getAttribute('data-package-id');
-                await showEditPackage(packageId);
-                return;
-            }
-            
-            // Update Package button
-            if (target.id === 'updatePackageBtn') {
-                const packageId = target.getAttribute('data-package-id');
-                await updatePackage(packageId);
-                return;
-            }
-            
-            // Delete Package button
-            if (target.id === 'deletePackageBtn') {
-                const packageId = target.getAttribute('data-package-id');
-                await deletePackage(packageId);
-                return;
-            }
-            
-            // Toggle Package button
-            if (target.classList.contains('toggle-package-btn')) {
-                const packageId = target.getAttribute('data-package-id');
-                const newStatus = target.getAttribute('data-new-status') === 'true';
-                await togglePackage(packageId, newStatus);
-                return;
-            }
-            
-            // Approve Membership
-            if (target.classList.contains('approve-membership')) {
-                const userId = target.getAttribute('data-user-id');
-                const paymentId = target.getAttribute('data-payment-id');
-                if (userId && paymentId) {
-                    await approveMembership(userId, paymentId);
-                } else {
-                    console.error('Missing userId or paymentId');
-                    showToast('Error: Missing user or payment information', true);
-                }
-                return;
-            }
-            
-            // Reject Membership
-            if (target.classList.contains('reject-membership')) {
-                const userId = target.getAttribute('data-user-id');
-                const paymentId = target.getAttribute('data-payment-id');
-                if (userId && paymentId) {
-                    await rejectMembership(userId, paymentId);
-                } else {
-                    console.error('Missing userId or paymentId');
-                    showToast('Error: Missing user or payment information', true);
-                }
-                return;
-            }
-            
-            // View User Details
-            if (target.classList.contains('view-user-details')) {
-                const userId = target.getAttribute('data-user-id');
-                if (userId) {
-                    await viewUserDetails(userId);
-                }
-                return;
-            }
-            
-            // Send Individual Message
-            if (target.id === 'sendMessageBtn') {
-                await sendMessage();
-                return;
-            }
-            
-            // Individual Message button
-            if (target.id === 'individualMessageBtn') {
-                currentMessageType = 'individual';
-                const individualForm = document.getElementById('individualMessageForm');
-                const broadcastForm = document.getElementById('broadcastMessageForm');
-                if (individualForm && broadcastForm) {
-                    individualForm.style.display = 'block';
-                    broadcastForm.style.display = 'none';
-                }
-                target.classList.add('btn-primary');
-                const broadcastBtn = document.getElementById('broadcastMessageBtn');
-                if (broadcastBtn) {
-                    broadcastBtn.classList.remove('btn-primary');
-                }
-                return;
-            }
-            
-            // Broadcast Message button
-            if (target.id === 'broadcastMessageBtn') {
-                currentMessageType = 'broadcast';
-                const individualForm = document.getElementById('individualMessageForm');
-                const broadcastForm = document.getElementById('broadcastMessageForm');
-                if (individualForm && broadcastForm) {
-                    broadcastForm.style.display = 'block';
-                    individualForm.style.display = 'none';
-                }
-                target.classList.add('btn-primary');
-                const individualBtn = document.getElementById('individualMessageBtn');
-                if (individualBtn) {
-                    individualBtn.classList.remove('btn-primary');
-                }
-                return;
-            }
-            
-            // Send Broadcast button
-            if (target.id === 'sendBroadcastBtn' || target.closest('#sendBroadcastBtn')) {
-                await sendBroadcast();
-                return;
-            }
-            
-            // Preview Broadcast button
-            if (target.id === 'previewBroadcastBtn') {
-                previewBroadcast();
-                return;
-            }
-            
-            // Confirm Broadcast button (in modal)
-            if (target.id === 'confirmBroadcastBtn') {
-                await executeBroadcast();
-                return;
-            }
-            
-            // Cancel Broadcast button (in modal)
-            if (target.id === 'cancelBroadcastBtn') {
-                closeModal();
-                return;
-            }
-        });
-        
-        // Make functions globally available
-        window.showToast = showToast;
-        window.showModal = showModal;
-        window.closeModal = closeModal;
-        window.logout = logout;
-        window.switchTab = switchTab;
-        window.toggleUserStatus = toggleUserStatus;
-        window.makeAdmin = makeAdmin;
-        window.showAdjustWallet = showAdjustWallet;
-        window.adjustWallet = adjustWallet;
-        window.showCreateTask = showCreateTask;
-        window.createTask = createTask;
-        window.toggleTask = toggleTask;
-        window.editTask = editTask;
-        window.updateTask = updateTask;
-        window.reviewSubmission = reviewSubmission;
-        window.processWithdrawal = processWithdrawal;
-        window.approveMembership = approveMembership;
-        window.rejectMembership = rejectMembership;
-        window.sendMessage = sendMessage;
-        window.sendBroadcast = sendBroadcast;
-        window.executeBroadcast = executeBroadcast;
-        window.previewBroadcast = previewBroadcast;
-        window.showCreatePackage = showCreatePackage;
-        window.createPackage = createPackage;
-        window.showEditPackage = showEditPackage;
-        window.updatePackage = updatePackage;
-        window.deletePackage = deletePackage;
-        window.togglePackage = togglePackage;
-        window.viewUserDetails = viewUserDetails;
-    </script>
-</body>
+
+<!DOCTYPE html>  <html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">  
+    <title>NextGen · Admin Dashboard</title>  
+    <!-- Firebase -->  
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>  
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>  
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>  
+    <!-- Font Awesome -->  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
+    <!-- Google Fonts -->  
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">  
+    <style>  
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }  
+        body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }  
+        .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }  
+        .header { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 2rem; padding: 1rem 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; color: white; }  
+        .logo h2 { background: linear-gradient(135deg, #818cf8, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }  
+        .admin-badge { background: #ef4444; padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.9rem; }  
+        .logout-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }  
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }  
+        .stat-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 1.5rem; padding: 1.5rem; color: white; border: 1px solid rgba(255,255,255,0.2); }  
+        .stat-card i { font-size: 2rem; color: #818cf8; margin-bottom: 0.5rem; }  
+        .stat-value { font-size: 2rem; font-weight: 700; }  
+        .tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }  
+        .tab { padding: 0.8rem 1.5rem; border: none; border-radius: 40px; background: rgba(255,255,255,0.1); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; }  
+        .tab.active { background: #6366f1; }  
+        .content { background: white; border-radius: 2rem; padding: 2rem; min-height: 500px; }  
+        .data-table { width: 100%; border-collapse: collapse; }  
+        .data-table th { text-align: left; padding: 1rem; background: #f8fafc; }  
+        .data-table td { padding: 1rem; border-bottom: 1px solid #e2e8f0; }  
+        .badge { padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.8rem; font-weight: 600; display: inline-block; }  
+        .badge.success { background: #10b98120; color: #10b981; border: 1px solid #10b981; }  
+        .badge.warning { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b; }  
+        .badge.danger { background: #ef444420; color: #ef4444; border: 1px solid #ef4444; }  
+        .badge.primary { background: #6366f120; color: #6366f1; border: 1px solid #6366f1; }  
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; margin: 0.2rem; pointer-events: auto; }  
+        .btn-primary { background: #6366f1; color: white; }  
+        .btn-success { background: #10b981; color: white; }  
+        .btn-danger { background: #ef4444; color: white; }  
+        .btn-warning { background: #f59e0b; color: white; }  
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 2rem; padding: 2rem; max-width: 500px; width: 90%; z-index: 1000; max-height: 80vh; overflow-y: auto; }  
+        .modal.active { display: block; }  
+        .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 999; }  
+        .modal-backdrop.active { display: block; }  
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 1rem 2rem; border-radius: 40px; z-index: 2000; display: none; }  
+        input, textarea, select { width: 100%; padding: 0.8rem; border: 2px solid #e2e8f0; border-radius: 40px; margin-bottom: 1rem; font-size: 1rem; }  
+        textarea { border-radius: 20px; min-height: 100px; }  
+        .submission-card { background: #f8fafc; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1rem; }  
+        .flex-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }  
+        .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }  
+        .action-buttons button { position: relative; z-index: 1; }  
+        @media (max-width: 768px) { .header { flex-direction: column; gap: 1rem; text-align: center; } }  
+    </style>  
+</head>  
+<body>  
+    <div class="app-container">  
+        <div class="header">  
+            <div class="logo">  
+                <h2>🔷 NextGen Admin</h2>  
+            </div>  
+            <div style="display: flex; align-items: center; gap: 1rem;">  
+                <span id="adminName">Loading...</span>  
+                <span class="admin-badge">Admin</span>  
+                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>  
+            </div>  
+        </div>  <div class="stats-grid" id="statsGrid"></div>  
+      
+    <div class="tabs">  
+        <button class="tab active" data-tab="users">👥 Users</button>  
+        <button class="tab" data-tab="tasks">📋 Tasks</button>  
+        <button class="tab" data-tab="submissions">📝 Submissions</button>  
+        <button class="tab" data-tab="withdrawals">💰 Withdrawals</button>  
+        <button class="tab" data-tab="memberships">👑 Memberships</button>  
+        <button class="tab" data-tab="messages">💬 Messages</button>  
+    </div>  
+      
+    <div class="content" id="content"></div>  
+</div>  
+  
+<!-- Modal -->  
+<div class="modal-backdrop" id="modalBackdrop"></div>  
+<div class="modal" id="modal">  
+    <div id="modalContent"></div>  
+    <div class="flex-row" style="justify-content: flex-end; margin-top: 1rem;">  
+        <button class="btn btn-danger" id="closeModalBtn">Close</button>  
+    </div>  
+</div>  
+  
+<!-- Toast -->  
+<div class="toast" id="toast"></div>  
+  
+<script>  
+    // Firebase Config  
+    const firebaseConfig = {  
+        apiKey: "AIzaSyChk2JA68-I5s1D0S10r9WK71LgTNi4hRQ",  
+        authDomain: "nextgen-5fb6f.firebaseapp.com",  
+        projectId: "nextgen-5fb6f",  
+        storageBucket: "nextgen-5fb6f.firebasestorage.app",  
+        messagingSenderId: "100132076455",  
+        appId: "1:100132076455:web:c5aea1f6e1a5ebbea99482"  
+    };  
+      
+    firebase.initializeApp(firebaseConfig);  
+    const auth = firebase.auth();  
+    const db = firebase.firestore();  
+      
+    let currentUser = null;  
+    let currentTab = 'users';  
+    let currentMessageType = 'individual'; // 'individual' or 'broadcast'  
+      
+    // Check auth state  
+    auth.onAuthStateChanged(async (user) => {  
+        if (!user) {  
+            window.location.href = 'index.html';  
+            return;  
+        }  
+          
+        const doc = await db.collection('users').doc(user.uid).get();  
+        if (!doc.exists || doc.data().role !== 'admin') {  
+            auth.signOut();  
+            window.location.href = 'index.html';  
+            return;  
+        }  
+          
+        if (doc.data().active === false) {  
+            auth.signOut();  
+            window.location.href = 'index.html';  
+            return;  
+        }  
+          
+        currentUser = user;  
+        document.getElementById('adminName').textContent = doc.data().displayName;  
+          
+        loadDashboard();  
+    });  
+      
+    // Toast function  
+    function showToast(msg, isError = false) {  
+        const toast = document.getElementById('toast');  
+        toast.textContent = msg;  
+        toast.style.background = isError ? '#dc2626' : '#0f172a';  
+        toast.style.display = 'block';  
+        setTimeout(() => toast.style.display = 'none', 3000);  
+    }  
+      
+    // Modal functions  
+    function showModal(html) {  
+        document.getElementById('modalContent').innerHTML = html;  
+        document.getElementById('modal').classList.add('active');  
+        document.getElementById('modalBackdrop').classList.add('active');  
+    }  
+      
+    function closeModal() {  
+        document.getElementById('modal').classList.remove('active');  
+        document.getElementById('modalBackdrop').classList.remove('active');  
+    }  
+      
+    // Logout function  
+    function logout() {  
+        auth.signOut();  
+        window.location.href = 'index.html';  
+    }  
+      
+    // Tab switching function  
+    function switchTab(tab) {  
+        currentTab = tab;  
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));  
+        document.querySelector(`[data-tab="${tab}"]`).classList.add('active');  
+          
+        switch(tab) {  
+            case 'users': loadUsers(); break;  
+            case 'tasks': loadTasks(); break;  
+            case 'submissions': loadSubmissions(); break;  
+            case 'withdrawals': loadWithdrawals(); break;  
+            case 'memberships': loadMemberships(); break;  
+            case 'messages': loadMessages(); break;  
+        }  
+    }  
+      
+    // Load Dashboard Stats  
+    async function loadDashboard() {  
+        const usersSnapshot = await db.collection('users').get();  
+        const tasksSnapshot = await db.collection('tasks').get();  
+          
+        const pendingSubs = await db.collection('submissions')  
+            .where('status', '==', 'pending')  
+            .get();  
+          
+        const pendingWithdrawals = await db.collection('withdrawals')  
+            .where('status', '==', 'pending')  
+            .get();  
+          
+        document.getElementById('statsGrid').innerHTML = `  
+            <div class="stat-card">  
+                <i class="fas fa-users"></i>  
+                <div class="stat-value">${usersSnapshot.size}</div>  
+                <div class="stat-label">Total Users</div>  
+            </div>  
+            <div class="stat-card">  
+                <i class="fas fa-tasks"></i>  
+                <div class="stat-value">${tasksSnapshot.size}</div>  
+                <div class="stat-label">Tasks</div>  
+            </div>  
+            <div class="stat-card">  
+                <i class="fas fa-clock"></i>  
+                <div class="stat-value">${pendingSubs.size}</div>  
+                <div class="stat-label">Pending Reviews</div>  
+            </div>  
+            <div class="stat-card">  
+                <i class="fas fa-money-bill"></i>  
+                <div class="stat-value">${pendingWithdrawals.size}</div>  
+                <div class="stat-label">Pending Withdrawals</div>  
+            </div>  
+        `;  
+          
+        loadUsers();  
+    }  
+      
+    // Load Users  
+    async function loadUsers() {  
+        const snapshot = await db.collection('users').orderBy('createdAt', 'desc').get();  
+          
+        let html = '<h3 style="margin-bottom:1.5rem;">User Management</h3>';  
+        html += '<table class="data-table">';  
+        html += '<tr><th>Email</th><th>Name</th><th>Wallet</th><th>Role</th><th>Status</th><th>Actions</th></tr>';  
+          
+        snapshot.forEach(doc => {  
+            const user = doc.data();  
+            html += `  
+                <tr>  
+                    <td>${user.email}</td>  
+                    <td>${user.displayName}</td>  
+                    <td>$${user.wallet || 0}</td>  
+                    <td>${user.role}</td>  
+                    <td><span class="badge ${user.active ? 'success' : 'danger'}">${user.active ? 'Active' : 'Inactive'}</span></td>  
+                    <td class="action-buttons">  
+                        <button class="btn btn-primary toggle-status-btn" data-user-id="${doc.id}" data-new-status="${!user.active}">${user.active ? 'Deactivate' : 'Activate'}</button>  
+                        <button class="btn btn-success adjust-wallet-btn" data-user-id="${doc.id}" data-user-name="${user.displayName}" data-wallet="${user.wallet || 0}">Adjust Wallet</button>  
+                        ${user.role !== 'admin' ? `<button class="btn btn-warning make-admin-btn" data-user-id="${doc.id}">Make Admin</button>` : ''}  
+                    </td>  
+                </tr>  
+            `;  
+        });  
+          
+        html += '</table>';  
+        document.getElementById('content').innerHTML = html;  
+    }  
+      
+    // Toggle User Status  
+    async function toggleUserStatus(userId, newStatus) {  
+        await db.collection('users').doc(userId).update({ active: newStatus });  
+        showToast('User status updated');  
+        loadUsers();  
+    }  
+      
+    // Make Admin  
+    async function makeAdmin(userId) {  
+        await db.collection('users').doc(userId).update({ role: 'admin' });  
+        showToast('User is now admin');  
+        loadUsers();  
+    }  
+      
+    // Show Adjust Wallet Modal  
+    function showAdjustWallet(userId, userName, currentWallet) {  
+        showModal(`  
+            <h3 style="margin-bottom:1rem;">Adjust Wallet - ${userName}</h3>  
+            <p>Current Balance: $${currentWallet}</p>  
+            <input type="number" id="adjustAmount" placeholder="Amount" step="0.01" min="0">  
+            <select id="adjustType">  
+                <option value="add">Add Funds</option>  
+                <option value="subtract">Subtract Funds</option>  
+            </select>  
+            <textarea id="adjustReason" placeholder="Reason for adjustment (required)"></textarea>  
+            <button class="btn btn-primary apply-adjustment-btn" data-user-id="${userId}" style="width:100%;">Apply</button>  
+        `);  
+    }  
+      
+    // Adjust Wallet  
+    async function adjustWallet(userId) {  
+        const amount = parseFloat(document.getElementById('adjustAmount')?.value);  
+        const type = document.getElementById('adjustType')?.value;  
+        const reason = document.getElementById('adjustReason')?.value;  
+          
+        if (!amount || amount <= 0) {  
+            showToast('Please enter a valid amount greater than 0', true);  
+            return;  
+        }  
+          
+        if (!reason || reason.trim() === '') {  
+            showToast('Please enter a reason for the adjustment', true);  
+            return;  
+        }  
+          
+        if (!userId) {  
+            showToast('User ID is missing', true);  
+            return;  
+        }  
+          
+        const adjustment = type === 'add' ? amount : -amount;  
+          
+        try {  
+            await db.collection('users').doc(userId).update({  
+                wallet: firebase.firestore.FieldValue.increment(adjustment)  
+            });  
+              
+            await db.collection('walletAdjustments').add({  
+                userId,  
+                adjustedBy: currentUser.uid,  
+                amount: adjustment,  
+                reason: reason.trim(),  
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()  
+            });  
+              
+            closeModal();  
+            showToast(`Wallet adjusted by $${amount.toFixed(2)}`);  
+            loadUsers();  
+        } catch (error) {  
+            console.error('Error adjusting wallet:', error);  
+            showToast('Error adjusting wallet: ' + error.message, true);  
+        }  
+    }  
+      
+    // Load Tasks  
+    async function loadTasks() {  
+        const snapshot = await db.collection('tasks').orderBy('createdAt', 'desc').get();  
+          
+        let html = `  
+            <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;">  
+                <h3>Task Management</h3>  
+                <button class="btn btn-primary" id="createTaskBtn">+ New Task</button>  
+            </div>  
+            <table class="data-table">  
+            <tr><th>Title</th><th>Reward</th><th>Category</th><th>Difficulty</th><th>Submissions</th><th>Status</th><th>Actions</th></tr>  
+        `;  
+          
+        snapshot.forEach(doc => {  
+            const task = doc.data();  
+            html += `  
+                <tr>  
+                    <td>${task.title}</td>  
+                    <td>$${task.reward}</td>  
+                    <td>${task.category}</td>  
+                    <td>${task.difficulty}</td>  
+                    <td>${task.submissionsCount || 0}</td>  
+                    <td><span class="badge ${task.active ? 'success' : 'danger'}">${task.active ? 'Active' : 'Inactive'}</span></td>  
+                    <td class="action-buttons">  
+                        <button class="btn btn-primary edit-task-btn" data-task-id="${doc.id}">Edit</button>  
+                        <button class="btn btn-warning toggle-task-btn" data-task-id="${doc.id}" data-new-status="${!task.active}">${task.active ? 'Deactivate' : 'Activate'}</button>  
+                    </td>  
+                </tr>  
+            `;  
+        });  
+          
+        html += '</table>';  
+        document.getElementById('content').innerHTML = html;  
+    }  
+      
+    // Show Create Task Modal  
+    function showCreateTask() {  
+        showModal(`  
+            <h3 style="margin-bottom:1rem;">Create New Task</h3>  
+            <input type="text" id="taskTitle" placeholder="Title">  
+            <textarea id="taskDescription" placeholder="Description"></textarea>  
+            <input type="number" id="taskReward" placeholder="Reward (USD)">  
+            <select id="taskCategory">  
+                <option value="writing">Writing</option>  
+                <option value="design">Design</option>  
+                <option value="development">Development</option>  
+                <option value="marketing">Marketing</option>  
+                <option value="other">Other</option>  
+            </select>  
+            <select id="taskDifficulty">  
+                <option value="easy">Easy</option>  
+                <option value="medium">Medium</option>  
+                <option value="hard">Hard</option>  
+            </select>  
+            <button class="btn btn-primary" id="createTaskConfirmBtn" style="width:100%;">Create</button>  
+        `);  
+    }  
+      
+    // Create Task  
+    async function createTask() {  
+        const title = document.getElementById('taskTitle').value;  
+        const description = document.getElementById('taskDescription').value;  
+        const reward = parseFloat(document.getElementById('taskReward').value);  
+        const category = document.getElementById('taskCategory').value;  
+        const difficulty = document.getElementById('taskDifficulty').value;  
+          
+        if (!title || !description || !reward) {  
+            showToast('Fill all fields', true);  
+            return;  
+        }  
+          
+        await db.collection('tasks').add({  
+            title,  
+            description,  
+            reward,  
+            rewardKES: reward * 130,  
+            category,  
+            difficulty,  
+            active: true,  
+            submissionsCount: 0,  
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()  
+        });  
+          
+        closeModal();  
+        showToast('Task created');  
+        loadTasks();  
+    }  
+      
+    // Toggle Task  
+    async function toggleTask(taskId, newStatus) {  
+        await db.collection('tasks').doc(taskId).update({ active: newStatus });  
+        showToast('Task updated');  
+        loadTasks();  
+    }  
+      
+    // Edit Task  
+    async function editTask(taskId) {  
+        const task = await db.collection('tasks').doc(taskId).get();  
+        const data = task.data();  
+          
+        showModal(`  
+            <h3 style="margin-bottom:1rem;">Edit Task</h3>  
+            <input type="text" id="editTitle" value="${data.title}">  
+            <textarea id="editDescription">${data.description}</textarea>  
+            <input type="number" id="editReward" value="${data.reward}">  
+            <select id="editCategory">  
+                <option value="writing" ${data.category === 'writing' ? 'selected' : ''}>Writing</option>  
+                <option value="design" ${data.category === 'design' ? 'selected' : ''}>Design</option>  
+                <option value="development" ${data.category === 'development' ? 'selected' : ''}>Development</option>  
+                <option value="marketing" ${data.category === 'marketing' ? 'selected' : ''}>Marketing</option>  
+                <option value="other" ${data.category === 'other' ? 'selected' : ''}>Other</option>  
+            </select>  
+            <select id="editDifficulty">  
+                <option value="easy" ${data.difficulty === 'easy' ? 'selected' : ''}>Easy</option>  
+                <option value="medium" ${data.difficulty === 'medium' ? 'selected' : ''}>Medium</option>  
+                <option value="hard" ${data.difficulty === 'hard' ? 'selected' : ''}>Hard</option>  
+            </select>  
+            <button class="btn btn-primary" id="updateTaskBtn" data-task-id="${taskId}" style="width:100%;">Update</button>  
+        `);  
+    }  
+      
+    // Update Task  
+    async function updateTask(taskId) {  
+        const title = document.getElementById('editTitle').value;  
+        const description = document.getElementById('editDescription').value;  
+        const reward = parseFloat(document.getElementById('editReward').value);  
+        const category = document.getElementById('editCategory').value;  
+        const difficulty = document.getElementById('editDifficulty').value;  
+          
+        await db.collection('tasks').doc(taskId).update({  
+            title,  
+            description,  
+            reward,  
+            rewardKES: reward * 130,  
+            category,  
+            difficulty  
+        });  
+          
+        closeModal();  
+        showToast('Task updated');  
+        loadTasks();  
+    }  
+      
+    // Load Submissions  
+    async function loadSubmissions() {  
+        const snapshot = await db.collection('submissions')  
+            .where('status', '==', 'pending')  
+            .get();  
+          
+        let html = '<h3 style="margin-bottom:1.5rem;">Pending Submissions</h3>';  
+          
+        if (snapshot.empty) {  
+            html += '<p>No pending submissions.</p>';  
+        } else {  
+            snapshot.forEach(doc => {  
+                const sub = doc.data();  
+                html += `  
+                    <div class="submission-card" data-sub-id="${doc.id}">  
+                        <h4>${sub.taskTitle}</h4>  
+                        <p><strong>User:</strong> ${sub.userEmail}</p>  
+                        <p><strong>Work:</strong> ${sub.workText}</p>  
+                        <div class="flex-row" style="margin:1rem 0;">  
+                            <input type="number" class="submission-score" placeholder="Score (0-100)" min="0" max="100" style="width:120px;">  
+                            <textarea class="submission-review" placeholder="Feedback" style="flex:1;"></textarea>  
+                        </div>  
+                        <div class="flex-row">  
+                            <button class="btn btn-success approve-submission" data-sub-id="${doc.id}">Approve</button>  
+                            <button class="btn btn-danger reject-submission" data-sub-id="${doc.id}">Reject</button>  
+                        </div>  
+                    </div>  
+                `;  
+            });  
+        }  
+          
+        document.getElementById('content').innerHTML = html;  
+    }  
+      
+    // Review Submission  
+    async function reviewSubmission(subId, approved) {  
+        const submissionCard = document.querySelector(`[data-sub-id="${subId}"]`);  
+        const score = parseInt(submissionCard.querySelector('.submission-score')?.value || 0);  
+        const review = submissionCard.querySelector('.submission-review')?.value || '';  
+          
+        if (approved && (!score || score < 0 || score > 100)) {  
+            showToast('Enter valid score (0-100)', true);  
+            return;  
+        }  
+          
+        const subDoc = await db.collection('submissions').doc(subId).get();  
+        const sub = subDoc.data();  
+          
+        const taskDoc = await db.collection('tasks').doc(sub.taskId).get();  
+        const task = taskDoc.data();  
+          
+        let earned = 0;  
+        let status = approved ? 'approved' : 'rejected';  
+          
+        if (approved && score >= 50) {  
+            earned = (task.reward * score) / 100;  
+              
+            await db.collection('users').doc(sub.userId).update({  
+                wallet: firebase.firestore.FieldValue.increment(earned),  
+                totalEarned: firebase.firestore.FieldValue.increment(earned),  
+                tasksCompleted: firebase.firestore.FieldValue.increment(1)  
+            });  
+        } else if (approved && score < 50) {  
+            status = 'rejected';  
+        }  
+          
+        await db.collection('submissions').doc(subId).update({  
+            status,  
+            score: approved ? score : 0,  
+            review,  
+            earned,  
+            reviewedAt: firebase.firestore.FieldValue.serverTimestamp()  
+        });  
+          
+        showToast(`Submission ${status}${earned > 0 ? ' - $' + earned : ''}`);  
+        loadSubmissions();  
+    }  
+      
+    // Load Withdrawals  
+    async function loadWithdrawals() {  
+        const snapshot = await db.collection('withdrawals')  
+            .where('status', '==', 'pending')  
+            .get();  
+          
+        let html = '<h3 style="margin-bottom:1.5rem;">Pending Withdrawals</h3>';  
+          
+        if (snapshot.empty) {  
+            html += '<p>No pending withdrawals.</p>';  
+        } else {  
+            snapshot.forEach(doc => {  
+                const w = doc.data();  
+                html += `  
+                    <div class="submission-card">  
+                        <p><strong>User:</strong> ${w.userEmail}</p>  
+                        <p><strong>Amount:</strong> $${w.amount} (KES ${w.amountKES})</p>  
+                        <p><strong>Method:</strong> ${w.method} - ${w.phone}</p>  
+                        <p><strong>Requested:</strong> ${w.requestedAt?.toDate().toLocaleString()}</p>  
+                        <button class="btn btn-success process-withdrawal" data-withdrawal-id="${doc.id}">Mark as Paid</button>  
+                    </div>  
+                `;  
+            });  
+        }  
+          
+        document.getElementById('content').innerHTML = html;  
+    }  
+      
+    // Process Withdrawal  
+    async function processWithdrawal(withdrawalId) {  
+        await db.collection('withdrawals').doc(withdrawalId).update({  
+            status: 'paid',  
+            paidAt: firebase.firestore.FieldValue.serverTimestamp()  
+        });  
+          
+        showToast('Withdrawal marked as paid');  
+        loadWithdrawals();  
+    }  
+      
+    // Load Memberships  
+    async function loadMemberships() {  
+        const snapshot = await db.collection('membershipPayments')  
+            .where('status', '==', 'pending')  
+            .get();  
+          
+        let html = '<h3 style="margin-bottom:1.5rem;">Pending Memberships</h3>';  
+          
+        if (snapshot.empty) {  
+            html += '<p>No pending memberships.</p>';  
+        } else {  
+            snapshot.forEach(doc => {  
+                const p = doc.data();  
+                html += `  
+                    <div class="submission-card">  
+                        <p><strong>User:</strong> ${p.userEmail}</p>  
+                        <p><strong>Transaction:</strong> ${p.transactionCode}</p>  
+                        <p><strong>Submitted:</strong> ${p.submittedAt?.toDate().toLocaleString()}</p>  
+                        <div class="flex-row">  
+                            <button class="btn btn-success approve-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">Approve</button>  
+                            <button class="btn btn-danger reject-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">Reject</button>  
+                        </div>  
+                    </div>  
+                `;  
+            });  
+        }  
+          
+        document.getElementById('content').innerHTML = html;  
+    }  
+      
+    // Approve Membership  
+    async function approveMembership(userId, paymentId) {  
+        await db.collection('users').doc(userId).update({  
+            membershipPaid: true,  
+            membershipStatus: 'approved'  
+        });  
+          
+        await db.collection('membershipPayments').doc(paymentId).update({  
+            status: 'approved'  
+        });  
+          
+        showToast('Membership approved');  
+        loadMemberships();  
+    }  
+      
+    // Reject Membership  
+    async function rejectMembership(userId, paymentId) {  
+        await db.collection('users').doc(userId).update({  
+            membershipStatus: 'rejected'  
+        });  
+          
+        await db.collection('membershipPayments').doc(paymentId).update({  
+            status: 'rejected'  
+        });  
+          
+        showToast('Membership rejected');  
+        loadMemberships();  
+    }  
+      
+    // Load Messages (UPDATED with broadcast feature)  
+    async function loadMessages() {  
+        const users = await db.collection('users').get();  
+          
+        let options = '';  
+        users.forEach(doc => {  
+            const user = doc.data();  
+            options += `<option value="${doc.id}">${user.email} - ${user.displayName}</option>`;  
+        });  
+          
+        const messages = await db.collection('messages')  
+            .orderBy('createdAt', 'desc')  
+            .limit(20)  
+            .get();  
+          
+        let messagesHtml = '';  
+        messages.forEach(doc => {  
+            const msg = doc.data();  
+            const isBroadcast = msg.userId === 'ALL_USERS' || msg.isBroadcast;  
+            messagesHtml += `  
+                <div class="submission-card" style="border-left: 4px solid ${isBroadcast ? '#6366f1' : '#10b981'}">  
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">  
+                        <strong style="color: ${isBroadcast ? '#6366f1' : '#10b981'}">  
+                            ${isBroadcast ? '📢 Broadcast to All Users' : `👤 To: ${msg.userEmail || msg.userId}`}  
+                        </strong>  
+                        <small>${msg.createdAt?.toDate().toLocaleString()}</small>  
+                    </div>  
+                    ${msg.title ? `<h4 style="margin: 0.5rem 0; color: #1f2937;">${msg.title}</h4>` : ''}  
+                    <p style="margin: 0.5rem 0;">${msg.message}</p>  
+                    ${msg.sentCount ? `<small style="color: #6b7280;">✓ Delivered to ${msg.sentCount} users</small>` : ''}  
+                </div>  
+            `;  
+        });  
+          
+        let html = `  
+            <h3 style="margin-bottom:1.5rem;">Message Center</h3>  
+              
+            <!-- Toggle between individual and broadcast -->  
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">  
+                <button class="btn ${currentMessageType === 'individual' ? 'btn-primary' : 'btn'}" id="individualMessageBtn">📨 Individual Message</button>  
+                <button class="btn ${currentMessageType === 'broadcast' ? 'btn-primary' : 'btn'}" id="broadcastMessageBtn">📢 Broadcast to All</button>  
+            </div>  
+              
+            <!-- Individual Message Form -->  
+            <div id="individualMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'individual' ? 'block' : 'none'};">  
+                <h4 style="margin-bottom:1rem;">Send Individual Message</h4>  
+                <select id="messageUser">  
+                    <option value="">Select User</option>  
+                    ${options}  
+                </select>  
+                <textarea id="messageText" placeholder="Type your message..."></textarea>  
+                <button class="btn btn-primary" id="sendMessageBtn">Send Message</button>  
+            </div>  
+              
+            <!-- Broadcast Message Form -->  
+            <div id="broadcastMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'broadcast' ? 'block' : 'none'};">  
+                <h4 style="margin-bottom:1rem; color: #6366f1;">Send Broadcast to All Users</h4>  
+                <div style="background: #6366f120; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">  
+                    <p style="margin: 0;"><strong>⚠️ Important:</strong> This message will be sent to ALL registered users (${users.size} users total).</p>  
+                </div>  
+                <input type="text" id="broadcastTitle" placeholder="Message Title (Optional)">  
+                <textarea id="broadcastMessage" placeholder="Type your broadcast message..." style="min-height: 120px;"></textarea>  
+                <div style="display: flex; gap: 0.5rem;">  
+                    <button class="btn btn-primary" id="sendBroadcastBtn" style="flex: 1;">  
+                        <i class="fas fa-bullhorn"></i> Send Broadcast to All Users  
+                    </button>  
+                    <button class="btn" id="previewBroadcastBtn">  
+                        <i class="fas fa-eye"></i> Preview  
+                    </button>  
+                </div>  
+            </div>  
+              
+            <!-- Recent Messages -->  
+            <h4 style="margin-bottom:1rem; display: flex; justify-content: space-between; align-items: center;">  
+                <span>Recent Messages</span>  
+                <span class="badge primary">${messages.size} messages</span>  
+            </h4>  
+            ${messagesHtml || '<p style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 1rem;">No messages yet</p>'}  
+        `;  
+          
+        document.getElementById('content').innerHTML = html;  
+    }  
+      
+    // Send Individual Message  
+    async function sendMessage() {  
+        const userId = document.getElementById('messageUser').value;  
+        const message = document.getElementById('messageText').value;  
+          
+        if (!userId) {  
+            showToast('Please select a user', true);  
+            return;  
+        }  
+          
+        if (!message) {  
+            showToast('Enter message', true);  
+            return;  
+        }  
+          
+        // Get user email for display  
+        const userDoc = await db.collection('users').doc(userId).get();  
+        const userEmail = userDoc.data().email;  
+          
+        await db.collection('messages').add({  
+            userId,  
+            userEmail,  
+            message,  
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()  
+        });  
+          
+        showToast('Message sent');  
+        document.getElementById('messageText').value = '';  
+        loadMessages();  
+    }  
+      
+    // Send Broadcast Message  
+    async function sendBroadcast() {  
+        const title = document.getElementById('broadcastTitle')?.value || '';  
+        const message = document.getElementById('broadcastMessage')?.value;  
+          
+        if (!message || message.trim() === '') {  
+            showToast('Please enter a message', true);  
+            return;  
+        }  
+          
+        // Show confirmation modal  
+        showModal(`  
+            <h3 style="margin-bottom:1rem; color: #6366f1;">Confirm Broadcast</h3>  
+            <div style="background: #6366f120; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">  
+                <p><strong>⚠️ You are about to send a message to ALL users</strong></p>  
+                <p>This action cannot be undone. Please review your message:</p>  
+            </div>  
+              
+            ${title ? `<p><strong>Title:</strong> ${title}</p>` : ''}  
+            <p><strong>Message:</strong></p>  
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;">  
+                ${message}  
+            </div>  
+              
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">  
+                <button class="btn btn-success" id="confirmBroadcastBtn" style="flex: 1;">  
+                    <i class="fas fa-check"></i> Yes, Send to All Users  
+                </button>  
+                <button class="btn btn-danger" id="cancelBroadcastBtn" style="flex: 1;">  
+                    <i class="fas fa-times"></i> Cancel  
+                </button>  
+            </div>  
+        `);  
+    }  
+      
+    // Execute Broadcast  
+    async function executeBroadcast() {  
+        const title = document.getElementById('broadcastTitle')?.value || '';  
+        const message = document.getElementById('broadcastMessage')?.value;  
+          
+        closeModal();  
+        showToast('Preparing broadcast...');  
+          
+        try {  
+            // Get all users  
+            const usersSnapshot = await db.collection('users').get();  
+            const sentCount = usersSnapshot.size;  
+              
+            // Create broadcast message in Firestore  
+            await db.collection('messages').add({  
+                userId: 'ALL_USERS',  
+                isBroadcast: true,  
+                title: title,  
+                message: message,  
+                sentCount: sentCount,  
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),  
+                sentBy: currentUser.uid  
+            });  
+              
+            // Create notifications for all users (optional - if you have a notifications collection)  
+            const batch = db.batch();  
+            usersSnapshot.docs.forEach((userDoc) => {  
+                const notifRef = db.collection('notifications').doc();  
+                batch.set(notifRef, {  
+                    userId: userDoc.id,  
+                    type: 'broadcast',  
+                    title: title || 'New Announcement',  
+                    message: message,  
+                    read: false,  
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()  
+                });  
+            });  
+              
+            // Commit batch  
+            await batch.commit();  
+              
+            showToast(`✅ Broadcast sent to ${sentCount} users!`);  
+              
+            // Clear form  
+            document.getElementById('broadcastMessage').value = '';  
+            if (document.getElementById('broadcastTitle')) {  
+                document.getElementById('broadcastTitle').value = '';  
+            }  
+              
+            // Reload messages  
+            loadMessages();  
+              
+        } catch (error) {  
+            console.error('Broadcast error:', error);  
+            showToast('Error sending broadcast: ' + error.message, true);  
+        }  
+    }  
+      
+    // Preview Broadcast  
+    function previewBroadcast() {  
+        const title = document.getElementById('broadcastTitle')?.value || '';  
+        const message = document.getElementById('broadcastMessage')?.value;  
+          
+        if (!message) {  
+            showToast('Enter a message to preview', true);  
+            return;  
+        }  
+          
+        showModal(`  
+            <h3 style="margin-bottom:1rem;">Broadcast Preview</h3>  
+            <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 2rem; border-radius: 1rem;">  
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">  
+                    <i class="fas fa-bullhorn" style="font-size: 1.5rem;"></i>  
+                    <span style="font-weight: 600;">Admin Announcement</span>  
+                </div>  
+                ${title ? `<h4 style="margin-bottom: 0.5rem;">${title}</h4>` : ''}  
+                <p style="margin: 0; opacity: 0.95;">${message}</p>  
+                <div style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.7;">  
+                    — NextGen Admin  
+                </div>  
+            </div>  
+            <p style="margin-top: 1rem; color: #6b7280;">This is how users will see your broadcast message.</p>  
+            <button class="btn btn-primary" onclick="closeModal()" style="width: 100%;">Close Preview</button>  
+        `);  
+    }  
+      
+    // Event Delegation for all buttons  
+    document.addEventListener('click', async (e) => {  
+        const target = e.target;  
+          
+        // Logout button  
+        if (target.id === 'logoutBtn' || target.closest('#logoutBtn')) {  
+            logout();  
+            return;  
+        }  
+          
+        // Tab buttons  
+        if (target.classList.contains('tab') || target.closest('.tab')) {  
+            const tab = target.closest('.tab') || target;  
+            const tabName = tab.getAttribute('data-tab');  
+            if (tabName) {  
+                switchTab(tabName);  
+            }  
+            return;  
+        }  
+          
+        // Close modal button  
+        if (target.id === 'closeModalBtn' || target.closest('#closeModalBtn') || target.classList.contains('modal-backdrop')) {  
+            closeModal();  
+            return;  
+        }  
+          
+        // Adjust Wallet button  
+        if (target.classList.contains('adjust-wallet-btn')) {  
+            const userId = target.getAttribute('data-user-id');  
+            const userName = target.getAttribute('data-user-name');  
+            const wallet = target.getAttribute('data-wallet');  
+            showAdjustWallet(userId, userName, parseFloat(wallet || 0));  
+            return;  
+        }  
+          
+        // Apply Adjustment button (inside modal)  
+        if (target.classList.contains('apply-adjustment-btn')) {  
+            const userId = target.getAttribute('data-user-id');  
+            await adjustWallet(userId);  
+            return;  
+        }  
+          
+        // Toggle User Status  
+        if (target.classList.contains('toggle-status-btn')) {  
+            const userId = target.getAttribute('data-user-id');  
+            const newStatus = target.getAttribute('data-new-status') === 'true';  
+            await toggleUserStatus(userId, newStatus);  
+            return;  
+        }  
+          
+        // Make Admin  
+        if (target.classList.contains('make-admin-btn')) {  
+            const userId = target.getAttribute('data-user-id');  
+            await makeAdmin(userId);  
+            return;  
+        }  
+          
+        // Create Task button  
+        if (target.id === 'createTaskBtn') {  
+            showCreateTask();  
+            return;  
+        }  
+          
+        // Create Task Confirm button  
+        if (target.id === 'createTaskConfirmBtn') {  
+            await createTask();  
+            return;  
+        }  
+          
+        // Edit Task button  
+        if (target.classList.contains('edit-task-btn')) {  
+            const taskId = target.getAttribute('data-task-id');  
+            await editTask(taskId);  
+            return;  
+        }  
+          
+        // Update Task button  
+        if (target.id === 'updateTaskBtn') {  
+            const taskId = target.getAttribute('data-task-id');  
+            await updateTask(taskId);  
+            return;  
+        }  
+          
+        // Toggle Task button  
+        if (target.classList.contains('toggle-task-btn')) {  
+            const taskId = target.getAttribute('data-task-id');  
+            const newStatus = target.getAttribute('data-new-status') === 'true';  
+            await toggleTask(taskId, newStatus);  
+            return;  
+        }  
+          
+        // Approve Submission  
+        if (target.classList.contains('approve-submission')) {  
+            const subId = target.getAttribute('data-sub-id');  
+            await reviewSubmission(subId, true);  
+            return;  
+        }  
+          
+        // Reject Submission  
+        if (target.classList.contains('reject-submission')) {  
+            const subId = target.getAttribute('data-sub-id');  
+            await reviewSubmission(subId, false);  
+            return;  
+        }  
+          
+        // Process Withdrawal  
+        if (target.classList.contains('process-withdrawal')) {  
+            const withdrawalId = target.getAttribute('data-withdrawal-id');  
+            await processWithdrawal(withdrawalId);  
+            return;  
+        }  
+          
+        // Approve Membership  
+        if (target.classList.contains('approve-membership')) {  
+            const userId = target.getAttribute('data-user-id');  
+            const paymentId = target.getAttribute('data-payment-id');  
+            await approveMembership(userId, paymentId);  
+            return;  
+        }  
+          
+        // Reject Membership  
+        if (target.classList.contains('reject-membership')) {  
+            const userId = target.getAttribute('data-user-id');  
+            const paymentId = target.getAttribute('data-payment-id');  
+            await rejectMembership(userId, paymentId);  
+            return;  
+        }  
+          
+        // Send Individual Message  
+        if (target.id === 'sendMessageBtn') {  
+            await sendMessage();  
+            return;  
+        }  
+          
+        // Individual Message button  
+        if (target.id === 'individualMessageBtn') {  
+            currentMessageType = 'individual';  
+            document.getElementById('individualMessageForm').style.display = 'block';  
+            document.getElementById('broadcastMessageForm').style.display = 'none';  
+            target.classList.add('btn-primary');  
+            document.getElementById('broadcastMessageBtn').classList.remove('btn-primary');  
+            return;  
+        }  
+          
+        // Broadcast Message button  
+        if (target.id === 'broadcastMessageBtn') {  
+            currentMessageType = 'broadcast';  
+            document.getElementById('broadcastMessageForm').style.display = 'block';  
+            document.getElementById('individualMessageForm').style.display = 'none';  
+            target.classList.add('btn-primary');  
+            document.getElementById('individualMessageBtn').classList.remove('btn-primary');  
+            return;  
+        }  
+          
+        // Send Broadcast button  
+        if (target.id === 'sendBroadcastBtn' || target.closest('#sendBroadcastBtn')) {  
+            await sendBroadcast();  
+            return;  
+        }  
+          
+        // Preview Broadcast button  
+        if (target.id === 'previewBroadcastBtn') {  
+            previewBroadcast();  
+            return;  
+        }  
+          
+        // Confirm Broadcast button (in modal)  
+        if (target.id === 'confirmBroadcastBtn') {  
+            await executeBroadcast();  
+            return;  
+        }  
+          
+        // Cancel Broadcast button (in modal)  
+        if (target.id === 'cancelBroadcastBtn') {  
+            closeModal();  
+            return;  
+        }  
+    });  
+      
+    // Make functions globally available  
+    window.showToast = showToast;  
+    window.showModal = showModal;  
+    window.closeModal = closeModal;  
+    window.logout = logout;  
+    window.switchTab = switchTab;  
+    window.toggleUserStatus = toggleUserStatus;  
+    window.makeAdmin = makeAdmin;  
+    window.showAdjustWallet = showAdjustWallet;  
+    window.adjustWallet = adjustWallet;  
+    window.showCreateTask = showCreateTask;  
+    window.createTask = createTask;  
+    window.toggleTask = toggleTask;  
+    window.editTask = editTask;  
+    window.updateTask = updateTask;  
+    window.reviewSubmission = reviewSubmission;  
+    window.processWithdrawal = processWithdrawal;  
+    window.approveMembership = approveMembership;  
+    window.rejectMembership = rejectMembership;  
+    window.sendMessage = sendMessage;  
+    window.sendBroadcast = sendBroadcast;  
+    window.executeBroadcast = executeBroadcast;  
+    window.previewBroadcast = previewBroadcast;  
+</script>
+
+</body>  
 </html>
