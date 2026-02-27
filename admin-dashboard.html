@@ -36,11 +36,13 @@
         .badge.warning { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b; }
         .badge.danger { background: #ef444420; color: #ef4444; border: 1px solid #ef4444; }
         .badge.primary { background: #6366f120; color: #6366f1; border: 1px solid #6366f1; }
+        .badge.info { background: #06b6d420; color: #06b6d4; border: 1px solid #06b6d4; }
         .btn { padding: 0.5rem 1rem; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; margin: 0.2rem; pointer-events: auto; }
         .btn-primary { background: #6366f1; color: white; }
         .btn-success { background: #10b981; color: white; }
         .btn-danger { background: #ef4444; color: white; }
         .btn-warning { background: #f59e0b; color: white; }
+        .btn-info { background: #06b6d4; color: white; }
         .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 2rem; padding: 2rem; max-width: 500px; width: 90%; z-index: 1000; max-height: 80vh; overflow-y: auto; }
         .modal.active { display: block; }
         .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 999; }
@@ -52,6 +54,18 @@
         .flex-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .action-buttons button { position: relative; z-index: 1; }
+        .package-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
+        .package-card { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 1.5rem; padding: 1.5rem; color: white; position: relative; overflow: hidden; }
+        .package-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0)); pointer-events: none; }
+        .package-card .price { font-size: 2.5rem; font-weight: 700; margin: 0.5rem 0; }
+        .package-card .duration { opacity: 0.9; margin-bottom: 1rem; }
+        .package-card .features { list-style: none; margin: 1rem 0; }
+        .package-card .features li { margin: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; }
+        .package-card .features i { color: #34d399; }
+        .membership-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-item { background: #f8fafc; padding: 1rem; border-radius: 1rem; text-align: center; }
+        .stat-item .label { color: #64748b; font-size: 0.9rem; }
+        .stat-item .value { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
         @media (max-width: 768px) { .header { flex-direction: column; gap: 1rem; text-align: center; } }
     </style>
 </head>
@@ -136,8 +150,78 @@
             currentUser = user;
             document.getElementById('adminName').textContent = doc.data().displayName;
             
+            // Initialize default membership packages if none exist
+            await initializeMembershipPackages();
+            
             loadDashboard();
         });
+        
+        // Initialize default membership packages
+        async function initializeMembershipPackages() {
+            const packagesSnapshot = await db.collection('membershipPackages').get();
+            
+            if (packagesSnapshot.empty) {
+                const defaultPackages = [
+                    {
+                        name: 'Basic',
+                        price: 299,
+                        priceKES: 299 * 130,
+                        duration: 'Monthly',
+                        features: [
+                            'Access to basic tasks',
+                            'Earn up to $100/month',
+                            'Standard support',
+                            'Withdrawal once per week'
+                        ],
+                        taskLimit: 10,
+                        withdrawalLimit: 1,
+                        active: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    {
+                        name: 'Premium',
+                        price: 599,
+                        priceKES: 599 * 130,
+                        duration: 'Monthly',
+                        features: [
+                            'Access to all tasks',
+                            'Earn up to $500/month',
+                            'Priority support',
+                            'Withdrawal twice per week',
+                            'Bonus tasks access'
+                        ],
+                        taskLimit: 30,
+                        withdrawalLimit: 2,
+                        active: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    {
+                        name: 'VIP',
+                        price: 999,
+                        priceKES: 999 * 130,
+                        duration: 'Monthly',
+                        features: [
+                            'Unlimited task access',
+                            'Earn up to $1000+/month',
+                            '24/7 VIP support',
+                            'Daily withdrawals',
+                            'Exclusive VIP tasks',
+                            'Higher reward rates'
+                        ],
+                        taskLimit: -1, // Unlimited
+                        withdrawalLimit: 7,
+                        active: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }
+                ];
+                
+                for (const pkg of defaultPackages) {
+                    await db.collection('membershipPackages').add(pkg);
+                }
+                
+                console.log('Default membership packages created');
+            }
+        }
         
         // Toast function
         function showToast(msg, isError = false) {
@@ -227,7 +311,7 @@
             
             let html = '<h3 style="margin-bottom:1.5rem;">User Management</h3>';
             html += '<table class="data-table">';
-            html += '<tr><th>Email</th><th>Name</th><th>Wallet</th><th>Role</th><th>Status</th><th>Actions</th></tr>';
+            html += '<tr><th>Email</th><th>Name</th><th>Wallet</th><th>Membership</th><th>Role</th><th>Status</th><th>Actions</th></tr>';
             
             snapshot.forEach(doc => {
                 const user = doc.data();
@@ -236,6 +320,7 @@
                         <td>${user.email}</td>
                         <td>${user.displayName}</td>
                         <td>$${user.wallet || 0}</td>
+                        <td><span class="badge ${user.membershipPaid ? 'success' : 'warning'}">${user.membershipPaid ? (user.membershipType || 'Premium') : 'Free'}</span></td>
                         <td>${user.role}</td>
                         <td><span class="badge ${user.active ? 'success' : 'danger'}">${user.active ? 'Active' : 'Inactive'}</span></td>
                         <td class="action-buttons">
@@ -585,27 +670,126 @@
             loadWithdrawals();
         }
         
-        // Load Memberships
+        // Load Memberships (UPDATED with package management)
         async function loadMemberships() {
-            const snapshot = await db.collection('membershipPayments')
-                .where('status', '==', 'pending')
+            // Get membership packages
+            const packagesSnapshot = await db.collection('membershipPackages')
+                .orderBy('price', 'asc')
                 .get();
             
-            let html = '<h3 style="margin-bottom:1.5rem;">Pending Memberships</h3>';
+            // Get pending payments
+            const pendingSnapshot = await db.collection('membershipPayments')
+                .where('status', '==', 'pending')
+                .orderBy('submittedAt', 'desc')
+                .get();
             
-            if (snapshot.empty) {
-                html += '<p>No pending memberships.</p>';
+            // Get membership stats
+            const totalMembers = await db.collection('users')
+                .where('membershipPaid', '==', true)
+                .get();
+            
+            const totalRevenue = await db.collection('membershipPayments')
+                .where('status', '==', 'approved')
+                .get();
+            
+            let totalAmount = 0;
+            totalRevenue.forEach(doc => {
+                totalAmount += doc.data().amount || 0;
+            });
+            
+            let html = `
+                <h3 style="margin-bottom:1.5rem;">Membership Management</h3>
+                
+                <!-- Membership Stats -->
+                <div class="membership-stats">
+                    <div class="stat-item">
+                        <div class="label">Active Members</div>
+                        <div class="value">${totalMembers.size}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="label">Pending Approvals</div>
+                        <div class="value">${pendingSnapshot.size}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="label">Total Revenue</div>
+                        <div class="value">$${totalAmount.toFixed(2)}</div>
+                    </div>
+                </div>
+                
+                <!-- Package Management -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin: 2rem 0 1rem;">
+                    <h4>Membership Packages</h4>
+                    <button class="btn btn-primary" id="createPackageBtn">
+                        <i class="fas fa-plus"></i> New Package
+                    </button>
+                </div>
+                
+                <div class="package-grid">
+            `;
+            
+            // Display packages
+            packagesSnapshot.forEach(doc => {
+                const pkg = doc.data();
+                html += `
+                    <div class="package-card" style="background: linear-gradient(135deg, ${pkg.color1 || '#667eea'}, ${pkg.color2 || '#764ba2'});">
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <h3>${pkg.name}</h3>
+                            <span class="badge ${pkg.active ? 'success' : 'danger'}" style="background: rgba(255,255,255,0.2); color: white;">
+                                ${pkg.active ? 'Active' : 'Inactive'}
+                            </span>
+                        </div>
+                        <div class="price">$${pkg.price}</div>
+                        <div class="duration">${pkg.duration}</div>
+                        <div style="margin: 1rem 0;">
+                            <small style="opacity:0.8;">KES ${pkg.priceKES || pkg.price * 130}</small>
+                        </div>
+                        <ul class="features">
+                            ${pkg.features ? pkg.features.map(f => `<li><i class="fas fa-check-circle"></i> ${f}</li>`).join('') : ''}
+                        </ul>
+                        <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                            <button class="btn btn-info edit-package-btn" data-package-id="${doc.id}" style="flex:1; background: rgba(255,255,255,0.2); color: white;">Edit</button>
+                            <button class="btn toggle-package-btn" data-package-id="${doc.id}" data-new-status="${!pkg.active}" style="flex:1; background: rgba(255,255,255,0.2); color: white;">
+                                ${pkg.active ? 'Deactivate' : 'Activate'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+            
+            // Pending Payments Section
+            html += `
+                <h4 style="margin: 2rem 0 1rem;">Pending Membership Approvals</h4>
+            `;
+            
+            if (pendingSnapshot.empty) {
+                html += '<p>No pending membership approvals.</p>';
             } else {
-                snapshot.forEach(doc => {
+                pendingSnapshot.forEach(doc => {
                     const p = doc.data();
                     html += `
                         <div class="submission-card">
-                            <p><strong>User:</strong> ${p.userEmail}</p>
-                            <p><strong>Transaction:</strong> ${p.transactionCode}</p>
-                            <p><strong>Submitted:</strong> ${p.submittedAt?.toDate().toLocaleString()}</p>
-                            <div class="flex-row">
-                                <button class="btn btn-success approve-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">Approve</button>
-                                <button class="btn btn-danger reject-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">Reject</button>
+                            <div style="display:flex; justify-content:space-between; align-items:start;">
+                                <div>
+                                    <h4>${p.userEmail}</h4>
+                                    <p><strong>Package:</strong> ${p.packageName || 'Premium'}</p>
+                                    <p><strong>Amount:</strong> $${p.amount} (KES ${p.amountKES})</p>
+                                    <p><strong>Transaction:</strong> ${p.transactionCode}</p>
+                                    <p><strong>Phone:</strong> ${p.phoneNumber}</p>
+                                    <p><small>Submitted: ${p.submittedAt?.toDate().toLocaleString()}</small></p>
+                                </div>
+                            </div>
+                            <div class="flex-row" style="margin-top:1rem;">
+                                <button class="btn btn-success approve-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                                <button class="btn btn-danger reject-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
+                                    <i class="fas fa-times"></i> Reject
+                                </button>
+                                <button class="btn btn-info view-user-details" data-user-id="${p.userId}">
+                                    <i class="fas fa-user"></i> View User
+                                </button>
                             </div>
                         </div>
                     `;
@@ -615,15 +799,171 @@
             document.getElementById('content').innerHTML = html;
         }
         
+        // Show Create Package Modal
+        function showCreatePackage() {
+            showModal(`
+                <h3 style="margin-bottom:1rem;">Create Membership Package</h3>
+                <input type="text" id="packageName" placeholder="Package Name (e.g., Premium)">
+                <input type="number" id="packagePrice" placeholder="Price (USD)" step="0.01" min="0">
+                <select id="packageDuration">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Yearly">Yearly</option>
+                    <option value="Lifetime">Lifetime</option>
+                </select>
+                <input type="number" id="packageTaskLimit" placeholder="Task Limit per day (-1 for unlimited)" step="1" min="-1">
+                <input type="number" id="packageWithdrawalLimit" placeholder="Withdrawals per week" step="1" min="1">
+                <div style="margin-bottom:1rem;">
+                    <label>Features (one per line)</label>
+                    <textarea id="packageFeatures" placeholder="Enter features, one per line&#10;Example:&#10;Access to all tasks&#10;Priority support&#10;Daily withdrawals" style="min-height:100px;"></textarea>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="color" id="packageColor1" value="#667eea" style="flex:1; height:40px;">
+                    <input type="color" id="packageColor2" value="#764ba2" style="flex:1; height:40px;">
+                </div>
+                <button class="btn btn-primary" id="createPackageConfirmBtn" style="width:100%; margin-top:1rem;">Create Package</button>
+            `);
+        }
+        
+        // Create Package
+        async function createPackage() {
+            const name = document.getElementById('packageName').value;
+            const price = parseFloat(document.getElementById('packagePrice').value);
+            const duration = document.getElementById('packageDuration').value;
+            const taskLimit = parseInt(document.getElementById('packageTaskLimit').value);
+            const withdrawalLimit = parseInt(document.getElementById('packageWithdrawalLimit').value);
+            const featuresText = document.getElementById('packageFeatures').value;
+            const color1 = document.getElementById('packageColor1').value;
+            const color2 = document.getElementById('packageColor2').value;
+            
+            if (!name || !price) {
+                showToast('Please fill required fields', true);
+                return;
+            }
+            
+            const features = featuresText.split('\n').filter(f => f.trim() !== '');
+            
+            await db.collection('membershipPackages').add({
+                name,
+                price,
+                priceKES: price * 130,
+                duration,
+                taskLimit,
+                withdrawalLimit,
+                features,
+                color1,
+                color2,
+                active: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            closeModal();
+            showToast('Package created successfully');
+            loadMemberships();
+        }
+        
+        // Show Edit Package Modal
+        async function showEditPackage(packageId) {
+            const packageDoc = await db.collection('membershipPackages').doc(packageId).get();
+            const pkg = packageDoc.data();
+            
+            showModal(`
+                <h3 style="margin-bottom:1rem;">Edit Package - ${pkg.name}</h3>
+                <input type="text" id="editPackageName" value="${pkg.name}" placeholder="Package Name">
+                <input type="number" id="editPackagePrice" value="${pkg.price}" step="0.01" min="0">
+                <select id="editPackageDuration">
+                    <option value="Monthly" ${pkg.duration === 'Monthly' ? 'selected' : ''}>Monthly</option>
+                    <option value="Quarterly" ${pkg.duration === 'Quarterly' ? 'selected' : ''}>Quarterly</option>
+                    <option value="Yearly" ${pkg.duration === 'Yearly' ? 'selected' : ''}>Yearly</option>
+                    <option value="Lifetime" ${pkg.duration === 'Lifetime' ? 'selected' : ''}>Lifetime</option>
+                </select>
+                <input type="number" id="editPackageTaskLimit" value="${pkg.taskLimit || 10}" placeholder="Task Limit per day">
+                <input type="number" id="editPackageWithdrawalLimit" value="${pkg.withdrawalLimit || 1}" placeholder="Withdrawals per week">
+                <div style="margin-bottom:1rem;">
+                    <label>Features (one per line)</label>
+                    <textarea id="editPackageFeatures" style="min-height:100px;">${pkg.features ? pkg.features.join('\n') : ''}</textarea>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="color" id="editPackageColor1" value="${pkg.color1 || '#667eea'}" style="flex:1; height:40px;">
+                    <input type="color" id="editPackageColor2" value="${pkg.color2 || '#764ba2'}" style="flex:1; height:40px;">
+                </div>
+                <button class="btn btn-primary" id="updatePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:1rem;">Update Package</button>
+                <button class="btn btn-danger" id="deletePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:0.5rem;">Delete Package</button>
+            `);
+        }
+        
+        // Update Package
+        async function updatePackage(packageId) {
+            const name = document.getElementById('editPackageName').value;
+            const price = parseFloat(document.getElementById('editPackagePrice').value);
+            const duration = document.getElementById('editPackageDuration').value;
+            const taskLimit = parseInt(document.getElementById('editPackageTaskLimit').value);
+            const withdrawalLimit = parseInt(document.getElementById('editPackageWithdrawalLimit').value);
+            const featuresText = document.getElementById('editPackageFeatures').value;
+            const color1 = document.getElementById('editPackageColor1').value;
+            const color2 = document.getElementById('editPackageColor2').value;
+            
+            if (!name || !price) {
+                showToast('Please fill required fields', true);
+                return;
+            }
+            
+            const features = featuresText.split('\n').filter(f => f.trim() !== '');
+            
+            await db.collection('membershipPackages').doc(packageId).update({
+                name,
+                price,
+                priceKES: price * 130,
+                duration,
+                taskLimit,
+                withdrawalLimit,
+                features,
+                color1,
+                color2,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            closeModal();
+            showToast('Package updated successfully');
+            loadMemberships();
+        }
+        
+        // Toggle Package Status
+        async function togglePackage(packageId, newStatus) {
+            await db.collection('membershipPackages').doc(packageId).update({
+                active: newStatus
+            });
+            showToast(`Package ${newStatus ? 'activated' : 'deactivated'}`);
+            loadMemberships();
+        }
+        
+        // Delete Package
+        async function deletePackage(packageId) {
+            if (confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
+                await db.collection('membershipPackages').doc(packageId).delete();
+                closeModal();
+                showToast('Package deleted');
+                loadMemberships();
+            }
+        }
+        
         // Approve Membership
         async function approveMembership(userId, paymentId) {
+            // Get payment details to know which package
+            const paymentDoc = await db.collection('membershipPayments').doc(paymentId).get();
+            const payment = paymentDoc.data();
+            
             await db.collection('users').doc(userId).update({
                 membershipPaid: true,
-                membershipStatus: 'approved'
+                membershipStatus: 'approved',
+                membershipType: payment.packageName || 'Premium',
+                membershipExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
             });
             
             await db.collection('membershipPayments').doc(paymentId).update({
-                status: 'approved'
+                status: 'approved',
+                approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                approvedBy: currentUser.uid
             });
             
             showToast('Membership approved');
@@ -637,14 +977,16 @@
             });
             
             await db.collection('membershipPayments').doc(paymentId).update({
-                status: 'rejected'
+                status: 'rejected',
+                rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                rejectedBy: currentUser.uid
             });
             
             showToast('Membership rejected');
             loadMemberships();
         }
         
-        // Load Messages (UPDATED with broadcast feature)
+        // Load Messages (with broadcast feature)
         async function loadMessages() {
             const users = await db.collection('users').get();
             
@@ -817,7 +1159,7 @@
                     sentBy: currentUser.uid
                 });
                 
-                // Create notifications for all users (optional - if you have a notifications collection)
+                // Create notifications for all users
                 const batch = db.batch();
                 usersSnapshot.docs.forEach((userDoc) => {
                     const notifRef = db.collection('notifications').doc();
@@ -991,6 +1333,47 @@
                 return;
             }
             
+            // Create Package button
+            if (target.id === 'createPackageBtn') {
+                showCreatePackage();
+                return;
+            }
+            
+            // Create Package Confirm button
+            if (target.id === 'createPackageConfirmBtn') {
+                await createPackage();
+                return;
+            }
+            
+            // Edit Package button
+            if (target.classList.contains('edit-package-btn')) {
+                const packageId = target.getAttribute('data-package-id');
+                await showEditPackage(packageId);
+                return;
+            }
+            
+            // Update Package button
+            if (target.id === 'updatePackageBtn') {
+                const packageId = target.getAttribute('data-package-id');
+                await updatePackage(packageId);
+                return;
+            }
+            
+            // Delete Package button
+            if (target.id === 'deletePackageBtn') {
+                const packageId = target.getAttribute('data-package-id');
+                await deletePackage(packageId);
+                return;
+            }
+            
+            // Toggle Package button
+            if (target.classList.contains('toggle-package-btn')) {
+                const packageId = target.getAttribute('data-package-id');
+                const newStatus = target.getAttribute('data-new-status') === 'true';
+                await togglePackage(packageId, newStatus);
+                return;
+            }
+            
             // Approve Membership
             if (target.classList.contains('approve-membership')) {
                 const userId = target.getAttribute('data-user-id');
@@ -1081,6 +1464,12 @@
         window.sendBroadcast = sendBroadcast;
         window.executeBroadcast = executeBroadcast;
         window.previewBroadcast = previewBroadcast;
+        window.showCreatePackage = showCreatePackage;
+        window.createPackage = createPackage;
+        window.showEditPackage = showEditPackage;
+        window.updatePackage = updatePackage;
+        window.deletePackage = deletePackage;
+        window.togglePackage = togglePackage;
     </script>
 </body>
 </html>
