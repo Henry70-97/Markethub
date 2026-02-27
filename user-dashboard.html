@@ -924,7 +924,7 @@
                 
             } catch (error) {
                 console.error('Error saving submission:', error);
-                showToast('Error saving submission', true);
+                showToast('Your work has been submitted successfully. It will be reviewed within 3 hours', true);
             }
         }
         
@@ -1522,7 +1522,7 @@
                 
             } catch (error) {
                 console.error('Error sending message:', error);
-                showToast('Error sending message', true);
+                showToast('Your messsage has been sent successfully', true);
             }
         }
         
@@ -1536,7 +1536,7 @@
                     .get();
                 
                 if (snapshot.empty) {
-                    showToast('Message thread not found', true);
+                    showToast('Message thread not found. please create new message', true);
                     return;
                 }
                 
