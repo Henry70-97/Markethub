@@ -158,68 +158,78 @@
         
         // Initialize default membership packages
         async function initializeMembershipPackages() {
-            const packagesSnapshot = await db.collection('membershipPackages').get();
-            
-            if (packagesSnapshot.empty) {
-                const defaultPackages = [
-                    {
-                        name: 'Basic',
-                        price: 299,
-                        priceKES: 299 * 130,
-                        duration: 'Monthly',
-                        features: [
-                            'Access to basic tasks',
-                            'Earn up to $100/month',
-                            'Standard support',
-                            'Withdrawal once per week'
-                        ],
-                        taskLimit: 10,
-                        withdrawalLimit: 1,
-                        active: true,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    },
-                    {
-                        name: 'Premium',
-                        price: 599,
-                        priceKES: 599 * 130,
-                        duration: 'Monthly',
-                        features: [
-                            'Access to all tasks',
-                            'Earn up to $500/month',
-                            'Priority support',
-                            'Withdrawal twice per week',
-                            'Bonus tasks access'
-                        ],
-                        taskLimit: 30,
-                        withdrawalLimit: 2,
-                        active: true,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    },
-                    {
-                        name: 'VIP',
-                        price: 999,
-                        priceKES: 999 * 130,
-                        duration: 'Monthly',
-                        features: [
-                            'Unlimited task access',
-                            'Earn up to $1000+/month',
-                            '24/7 VIP support',
-                            'Daily withdrawals',
-                            'Exclusive VIP tasks',
-                            'Higher reward rates'
-                        ],
-                        taskLimit: -1, // Unlimited
-                        withdrawalLimit: 7,
-                        active: true,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            try {
+                const packagesSnapshot = await db.collection('membershipPackages').get();
+                
+                if (packagesSnapshot.empty) {
+                    const defaultPackages = [
+                        {
+                            name: 'Basic',
+                            price: 299,
+                            priceKES: 299 * 130,
+                            duration: 'Monthly',
+                            features: [
+                                'Access to basic tasks',
+                                'Earn up to $100/month',
+                                'Standard support',
+                                'Withdrawal once per week'
+                            ],
+                            taskLimit: 10,
+                            withdrawalLimit: 1,
+                            active: true,
+                            color1: '#667eea',
+                            color2: '#764ba2',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        },
+                        {
+                            name: 'Premium',
+                            price: 599,
+                            priceKES: 599 * 130,
+                            duration: 'Monthly',
+                            features: [
+                                'Access to all tasks',
+                                'Earn up to $500/month',
+                                'Priority support',
+                                'Withdrawal twice per week',
+                                'Bonus tasks access'
+                            ],
+                            taskLimit: 30,
+                            withdrawalLimit: 2,
+                            active: true,
+                            color1: '#f093fb',
+                            color2: '#f5576c',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        },
+                        {
+                            name: 'VIP',
+                            price: 999,
+                            priceKES: 999 * 130,
+                            duration: 'Monthly',
+                            features: [
+                                'Unlimited task access',
+                                'Earn up to $1000+/month',
+                                '24/7 VIP support',
+                                'Daily withdrawals',
+                                'Exclusive VIP tasks',
+                                'Higher reward rates'
+                            ],
+                            taskLimit: -1, // Unlimited
+                            withdrawalLimit: 7,
+                            active: true,
+                            color1: '#4facfe',
+                            color2: '#00f2fe',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }
+                    ];
+                    
+                    for (const pkg of defaultPackages) {
+                        await db.collection('membershipPackages').add(pkg);
                     }
-                ];
-                
-                for (const pkg of defaultPackages) {
-                    await db.collection('membershipPackages').add(pkg);
+                    
+                    console.log('Default membership packages created');
                 }
-                
-                console.log('Default membership packages created');
+            } catch (error) {
+                console.error('Error initializing packages:', error);
             }
         }
         
@@ -670,133 +680,142 @@
             loadWithdrawals();
         }
         
-        // Load Memberships (UPDATED with package management)
+        // Load Memberships (with package management)
         async function loadMemberships() {
-            // Get membership packages
-            const packagesSnapshot = await db.collection('membershipPackages')
-                .orderBy('price', 'asc')
-                .get();
-            
-            // Get pending payments
-            const pendingSnapshot = await db.collection('membershipPayments')
-                .where('status', '==', 'pending')
-                .orderBy('submittedAt', 'desc')
-                .get();
-            
-            // Get membership stats
-            const totalMembers = await db.collection('users')
-                .where('membershipPaid', '==', true)
-                .get();
-            
-            const totalRevenue = await db.collection('membershipPayments')
-                .where('status', '==', 'approved')
-                .get();
-            
-            let totalAmount = 0;
-            totalRevenue.forEach(doc => {
-                totalAmount += doc.data().amount || 0;
-            });
-            
-            let html = `
-                <h3 style="margin-bottom:1.5rem;">Membership Management</h3>
+            try {
+                // Get membership packages
+                const packagesSnapshot = await db.collection('membershipPackages')
+                    .orderBy('price', 'asc')
+                    .get();
                 
-                <!-- Membership Stats -->
-                <div class="membership-stats">
-                    <div class="stat-item">
-                        <div class="label">Active Members</div>
-                        <div class="value">${totalMembers.size}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="label">Pending Approvals</div>
-                        <div class="value">${pendingSnapshot.size}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="label">Total Revenue</div>
-                        <div class="value">$${totalAmount.toFixed(2)}</div>
-                    </div>
-                </div>
+                // Get pending payments
+                const pendingSnapshot = await db.collection('membershipPayments')
+                    .where('status', '==', 'pending')
+                    .orderBy('submittedAt', 'desc')
+                    .get();
                 
-                <!-- Package Management -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin: 2rem 0 1rem;">
-                    <h4>Membership Packages</h4>
-                    <button class="btn btn-primary" id="createPackageBtn">
-                        <i class="fas fa-plus"></i> New Package
-                    </button>
-                </div>
+                // Get membership stats
+                const totalMembers = await db.collection('users')
+                    .where('membershipPaid', '==', 'true')
+                    .get();
                 
-                <div class="package-grid">
-            `;
-            
-            // Display packages
-            packagesSnapshot.forEach(doc => {
-                const pkg = doc.data();
-                html += `
-                    <div class="package-card" style="background: linear-gradient(135deg, ${pkg.color1 || '#667eea'}, ${pkg.color2 || '#764ba2'});">
-                        <div style="display:flex; justify-content:space-between; align-items:start;">
-                            <h3>${pkg.name}</h3>
-                            <span class="badge ${pkg.active ? 'success' : 'danger'}" style="background: rgba(255,255,255,0.2); color: white;">
-                                ${pkg.active ? 'Active' : 'Inactive'}
-                            </span>
+                const totalRevenue = await db.collection('membershipPayments')
+                    .where('status', '==', 'approved')
+                    .get();
+                
+                let totalAmount = 0;
+                totalRevenue.forEach(doc => {
+                    totalAmount += doc.data().amount || 0;
+                });
+                
+                let html = `
+                    <h3 style="margin-bottom:1.5rem;">Membership Management</h3>
+                    
+                    <!-- Membership Stats -->
+                    <div class="membership-stats">
+                        <div class="stat-item">
+                            <div class="label">Active Members</div>
+                            <div class="value">${totalMembers.size}</div>
                         </div>
-                        <div class="price">$${pkg.price}</div>
-                        <div class="duration">${pkg.duration}</div>
-                        <div style="margin: 1rem 0;">
-                            <small style="opacity:0.8;">KES ${pkg.priceKES || pkg.price * 130}</small>
+                        <div class="stat-item">
+                            <div class="label">Pending Approvals</div>
+                            <div class="value">${pendingSnapshot.size}</div>
                         </div>
-                        <ul class="features">
-                            ${pkg.features ? pkg.features.map(f => `<li><i class="fas fa-check-circle"></i> ${f}</li>`).join('') : ''}
-                        </ul>
-                        <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-                            <button class="btn btn-info edit-package-btn" data-package-id="${doc.id}" style="flex:1; background: rgba(255,255,255,0.2); color: white;">Edit</button>
-                            <button class="btn toggle-package-btn" data-package-id="${doc.id}" data-new-status="${!pkg.active}" style="flex:1; background: rgba(255,255,255,0.2); color: white;">
-                                ${pkg.active ? 'Deactivate' : 'Activate'}
-                            </button>
+                        <div class="stat-item">
+                            <div class="label">Total Revenue</div>
+                            <div class="value">$${totalAmount.toFixed(2)}</div>
                         </div>
                     </div>
+                    
+                    <!-- Package Management -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin: 2rem 0 1rem;">
+                        <h4>Membership Packages</h4>
+                        <button class="btn btn-primary" id="createPackageBtn">
+                            <i class="fas fa-plus"></i> New Package
+                        </button>
+                    </div>
+                    
+                    <div class="package-grid">
                 `;
-            });
-            
-            html += `</div>`;
-            
-            // Pending Payments Section
-            html += `
-                <h4 style="margin: 2rem 0 1rem;">Pending Membership Approvals</h4>
-            `;
-            
-            if (pendingSnapshot.empty) {
-                html += '<p>No pending membership approvals.</p>';
-            } else {
-                pendingSnapshot.forEach(doc => {
-                    const p = doc.data();
-                    html += `
-                        <div class="submission-card">
-                            <div style="display:flex; justify-content:space-between; align-items:start;">
-                                <div>
-                                    <h4>${p.userEmail}</h4>
-                                    <p><strong>Package:</strong> ${p.packageName || 'Premium'}</p>
-                                    <p><strong>Amount:</strong> $${p.amount} (KES ${p.amountKES})</p>
-                                    <p><strong>Transaction:</strong> ${p.transactionCode}</p>
-                                    <p><strong>Phone:</strong> ${p.phoneNumber}</p>
-                                    <p><small>Submitted: ${p.submittedAt?.toDate().toLocaleString()}</small></p>
+                
+                // Display packages
+                if (packagesSnapshot.empty) {
+                    html += '<p>No packages found. Create your first package!</p>';
+                } else {
+                    packagesSnapshot.forEach(doc => {
+                        const pkg = doc.data();
+                        html += `
+                            <div class="package-card" style="background: linear-gradient(135deg, ${pkg.color1 || '#667eea'}, ${pkg.color2 || '#764ba2'});">
+                                <div style="display:flex; justify-content:space-between; align-items:start;">
+                                    <h3>${pkg.name}</h3>
+                                    <span class="badge ${pkg.active ? 'success' : 'danger'}" style="background: rgba(255,255,255,0.2); color: white; border: none;">
+                                        ${pkg.active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+                                <div class="price">$${pkg.price}</div>
+                                <div class="duration">${pkg.duration}</div>
+                                <div style="margin: 1rem 0;">
+                                    <small style="opacity:0.8;">KES ${pkg.priceKES || pkg.price * 130}</small>
+                                </div>
+                                <ul class="features">
+                                    ${pkg.features ? pkg.features.map(f => `<li><i class="fas fa-check-circle"></i> ${f}</li>`).join('') : ''}
+                                </ul>
+                                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                                    <button class="btn btn-info edit-package-btn" data-package-id="${doc.id}" style="flex:1; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Edit</button>
+                                    <button class="btn toggle-package-btn" data-package-id="${doc.id}" data-new-status="${!pkg.active}" style="flex:1; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">
+                                        ${pkg.active ? 'Deactivate' : 'Activate'}
+                                    </button>
                                 </div>
                             </div>
-                            <div class="flex-row" style="margin-top:1rem;">
-                                <button class="btn btn-success approve-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
-                                    <i class="fas fa-check"></i> Approve
-                                </button>
-                                <button class="btn btn-danger reject-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
-                                    <i class="fas fa-times"></i> Reject
-                                </button>
-                                <button class="btn btn-info view-user-details" data-user-id="${p.userId}">
-                                    <i class="fas fa-user"></i> View User
-                                </button>
+                        `;
+                    });
+                }
+                
+                html += `</div>`;
+                
+                // Pending Payments Section
+                html += `
+                    <h4 style="margin: 2rem 0 1rem;">Pending Membership Approvals</h4>
+                `;
+                
+                if (pendingSnapshot.empty) {
+                    html += '<p>No pending membership approvals.</p>';
+                } else {
+                    pendingSnapshot.forEach(doc => {
+                        const p = doc.data();
+                        html += `
+                            <div class="submission-card">
+                                <div style="display:flex; justify-content:space-between; align-items:start;">
+                                    <div>
+                                        <h4>${p.userEmail}</h4>
+                                        <p><strong>Package:</strong> ${p.packageName || 'Premium'}</p>
+                                        <p><strong>Amount:</strong> $${p.amount} (KES ${p.amountKES})</p>
+                                        <p><strong>Transaction:</strong> ${p.transactionCode}</p>
+                                        <p><strong>Phone:</strong> ${p.phoneNumber}</p>
+                                        <p><small>Submitted: ${p.submittedAt?.toDate().toLocaleString()}</small></p>
+                                    </div>
+                                </div>
+                                <div class="flex-row" style="margin-top:1rem;">
+                                    <button class="btn btn-success approve-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                    <button class="btn btn-danger reject-membership" data-user-id="${p.userId}" data-payment-id="${doc.id}">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                    <button class="btn btn-info view-user-details" data-user-id="${p.userId}">
+                                        <i class="fas fa-user"></i> View User
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+                }
+                
+                document.getElementById('content').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading memberships:', error);
+                showToast('Error loading memberships: ' + error.message, true);
             }
-            
-            document.getElementById('content').innerHTML = html;
         }
         
         // Show Create Package Modal
@@ -827,277 +846,416 @@
         
         // Create Package
         async function createPackage() {
-            const name = document.getElementById('packageName').value;
-            const price = parseFloat(document.getElementById('packagePrice').value);
-            const duration = document.getElementById('packageDuration').value;
-            const taskLimit = parseInt(document.getElementById('packageTaskLimit').value);
-            const withdrawalLimit = parseInt(document.getElementById('packageWithdrawalLimit').value);
-            const featuresText = document.getElementById('packageFeatures').value;
-            const color1 = document.getElementById('packageColor1').value;
-            const color2 = document.getElementById('packageColor2').value;
-            
-            if (!name || !price) {
-                showToast('Please fill required fields', true);
-                return;
+            try {
+                const name = document.getElementById('packageName').value;
+                const price = parseFloat(document.getElementById('packagePrice').value);
+                const duration = document.getElementById('packageDuration').value;
+                const taskLimit = parseInt(document.getElementById('packageTaskLimit').value);
+                const withdrawalLimit = parseInt(document.getElementById('packageWithdrawalLimit').value);
+                const featuresText = document.getElementById('packageFeatures').value;
+                const color1 = document.getElementById('packageColor1').value;
+                const color2 = document.getElementById('packageColor2').value;
+                
+                if (!name || !price) {
+                    showToast('Please fill required fields', true);
+                    return;
+                }
+                
+                const features = featuresText.split('\n').filter(f => f.trim() !== '');
+                
+                await db.collection('membershipPackages').add({
+                    name,
+                    price,
+                    priceKES: price * 130,
+                    duration,
+                    taskLimit,
+                    withdrawalLimit,
+                    features,
+                    color1,
+                    color2,
+                    active: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                closeModal();
+                showToast('Package created successfully');
+                loadMemberships();
+            } catch (error) {
+                console.error('Error creating package:', error);
+                showToast('Error creating package: ' + error.message, true);
             }
-            
-            const features = featuresText.split('\n').filter(f => f.trim() !== '');
-            
-            await db.collection('membershipPackages').add({
-                name,
-                price,
-                priceKES: price * 130,
-                duration,
-                taskLimit,
-                withdrawalLimit,
-                features,
-                color1,
-                color2,
-                active: true,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            closeModal();
-            showToast('Package created successfully');
-            loadMemberships();
         }
         
         // Show Edit Package Modal
         async function showEditPackage(packageId) {
-            const packageDoc = await db.collection('membershipPackages').doc(packageId).get();
-            const pkg = packageDoc.data();
-            
-            showModal(`
-                <h3 style="margin-bottom:1rem;">Edit Package - ${pkg.name}</h3>
-                <input type="text" id="editPackageName" value="${pkg.name}" placeholder="Package Name">
-                <input type="number" id="editPackagePrice" value="${pkg.price}" step="0.01" min="0">
-                <select id="editPackageDuration">
-                    <option value="Monthly" ${pkg.duration === 'Monthly' ? 'selected' : ''}>Monthly</option>
-                    <option value="Quarterly" ${pkg.duration === 'Quarterly' ? 'selected' : ''}>Quarterly</option>
-                    <option value="Yearly" ${pkg.duration === 'Yearly' ? 'selected' : ''}>Yearly</option>
-                    <option value="Lifetime" ${pkg.duration === 'Lifetime' ? 'selected' : ''}>Lifetime</option>
-                </select>
-                <input type="number" id="editPackageTaskLimit" value="${pkg.taskLimit || 10}" placeholder="Task Limit per day">
-                <input type="number" id="editPackageWithdrawalLimit" value="${pkg.withdrawalLimit || 1}" placeholder="Withdrawals per week">
-                <div style="margin-bottom:1rem;">
-                    <label>Features (one per line)</label>
-                    <textarea id="editPackageFeatures" style="min-height:100px;">${pkg.features ? pkg.features.join('\n') : ''}</textarea>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <input type="color" id="editPackageColor1" value="${pkg.color1 || '#667eea'}" style="flex:1; height:40px;">
-                    <input type="color" id="editPackageColor2" value="${pkg.color2 || '#764ba2'}" style="flex:1; height:40px;">
-                </div>
-                <button class="btn btn-primary" id="updatePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:1rem;">Update Package</button>
-                <button class="btn btn-danger" id="deletePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:0.5rem;">Delete Package</button>
-            `);
+            try {
+                const packageDoc = await db.collection('membershipPackages').doc(packageId).get();
+                if (!packageDoc.exists) {
+                    showToast('Package not found', true);
+                    return;
+                }
+                const pkg = packageDoc.data();
+                
+                showModal(`
+                    <h3 style="margin-bottom:1rem;">Edit Package - ${pkg.name}</h3>
+                    <input type="text" id="editPackageName" value="${pkg.name}" placeholder="Package Name">
+                    <input type="number" id="editPackagePrice" value="${pkg.price}" step="0.01" min="0">
+                    <select id="editPackageDuration">
+                        <option value="Monthly" ${pkg.duration === 'Monthly' ? 'selected' : ''}>Monthly</option>
+                        <option value="Quarterly" ${pkg.duration === 'Quarterly' ? 'selected' : ''}>Quarterly</option>
+                        <option value="Yearly" ${pkg.duration === 'Yearly' ? 'selected' : ''}>Yearly</option>
+                        <option value="Lifetime" ${pkg.duration === 'Lifetime' ? 'selected' : ''}>Lifetime</option>
+                    </select>
+                    <input type="number" id="editPackageTaskLimit" value="${pkg.taskLimit || 10}" placeholder="Task Limit per day">
+                    <input type="number" id="editPackageWithdrawalLimit" value="${pkg.withdrawalLimit || 1}" placeholder="Withdrawals per week">
+                    <div style="margin-bottom:1rem;">
+                        <label>Features (one per line)</label>
+                        <textarea id="editPackageFeatures" style="min-height:100px;">${pkg.features ? pkg.features.join('\n') : ''}</textarea>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="color" id="editPackageColor1" value="${pkg.color1 || '#667eea'}" style="flex:1; height:40px;">
+                        <input type="color" id="editPackageColor2" value="${pkg.color2 || '#764ba2'}" style="flex:1; height:40px;">
+                    </div>
+                    <button class="btn btn-primary" id="updatePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:1rem;">Update Package</button>
+                    <button class="btn btn-danger" id="deletePackageBtn" data-package-id="${packageId}" style="width:100%; margin-top:0.5rem;">Delete Package</button>
+                `);
+            } catch (error) {
+                console.error('Error showing edit package:', error);
+                showToast('Error loading package details', true);
+            }
         }
         
         // Update Package
         async function updatePackage(packageId) {
-            const name = document.getElementById('editPackageName').value;
-            const price = parseFloat(document.getElementById('editPackagePrice').value);
-            const duration = document.getElementById('editPackageDuration').value;
-            const taskLimit = parseInt(document.getElementById('editPackageTaskLimit').value);
-            const withdrawalLimit = parseInt(document.getElementById('editPackageWithdrawalLimit').value);
-            const featuresText = document.getElementById('editPackageFeatures').value;
-            const color1 = document.getElementById('editPackageColor1').value;
-            const color2 = document.getElementById('editPackageColor2').value;
-            
-            if (!name || !price) {
-                showToast('Please fill required fields', true);
-                return;
+            try {
+                const name = document.getElementById('editPackageName').value;
+                const price = parseFloat(document.getElementById('editPackagePrice').value);
+                const duration = document.getElementById('editPackageDuration').value;
+                const taskLimit = parseInt(document.getElementById('editPackageTaskLimit').value);
+                const withdrawalLimit = parseInt(document.getElementById('editPackageWithdrawalLimit').value);
+                const featuresText = document.getElementById('editPackageFeatures').value;
+                const color1 = document.getElementById('editPackageColor1').value;
+                const color2 = document.getElementById('editPackageColor2').value;
+                
+                if (!name || !price) {
+                    showToast('Please fill required fields', true);
+                    return;
+                }
+                
+                const features = featuresText.split('\n').filter(f => f.trim() !== '');
+                
+                await db.collection('membershipPackages').doc(packageId).update({
+                    name,
+                    price,
+                    priceKES: price * 130,
+                    duration,
+                    taskLimit,
+                    withdrawalLimit,
+                    features,
+                    color1,
+                    color2,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                closeModal();
+                showToast('Package updated successfully');
+                loadMemberships();
+            } catch (error) {
+                console.error('Error updating package:', error);
+                showToast('Error updating package: ' + error.message, true);
             }
-            
-            const features = featuresText.split('\n').filter(f => f.trim() !== '');
-            
-            await db.collection('membershipPackages').doc(packageId).update({
-                name,
-                price,
-                priceKES: price * 130,
-                duration,
-                taskLimit,
-                withdrawalLimit,
-                features,
-                color1,
-                color2,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            closeModal();
-            showToast('Package updated successfully');
-            loadMemberships();
         }
         
         // Toggle Package Status
         async function togglePackage(packageId, newStatus) {
-            await db.collection('membershipPackages').doc(packageId).update({
-                active: newStatus
-            });
-            showToast(`Package ${newStatus ? 'activated' : 'deactivated'}`);
-            loadMemberships();
+            try {
+                await db.collection('membershipPackages').doc(packageId).update({
+                    active: newStatus
+                });
+                showToast(`Package ${newStatus ? 'activated' : 'deactivated'}`);
+                loadMemberships();
+            } catch (error) {
+                console.error('Error toggling package:', error);
+                showToast('Error updating package status', true);
+            }
         }
         
         // Delete Package
         async function deletePackage(packageId) {
             if (confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
-                await db.collection('membershipPackages').doc(packageId).delete();
-                closeModal();
-                showToast('Package deleted');
-                loadMemberships();
+                try {
+                    await db.collection('membershipPackages').doc(packageId).delete();
+                    closeModal();
+                    showToast('Package deleted');
+                    loadMemberships();
+                } catch (error) {
+                    console.error('Error deleting package:', error);
+                    showToast('Error deleting package', true);
+                }
             }
         }
         
         // Approve Membership
         async function approveMembership(userId, paymentId) {
-            // Get payment details to know which package
-            const paymentDoc = await db.collection('membershipPayments').doc(paymentId).get();
-            const payment = paymentDoc.data();
-            
-            await db.collection('users').doc(userId).update({
-                membershipPaid: true,
-                membershipStatus: 'approved',
-                membershipType: payment.packageName || 'Premium',
-                membershipExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
-            });
-            
-            await db.collection('membershipPayments').doc(paymentId).update({
-                status: 'approved',
-                approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                approvedBy: currentUser.uid
-            });
-            
-            showToast('Membership approved');
-            loadMemberships();
+            try {
+                showToast('Processing approval...');
+                
+                // Get payment details to know which package
+                const paymentDoc = await db.collection('membershipPayments').doc(paymentId).get();
+                if (!paymentDoc.exists) {
+                    showToast('Payment record not found', true);
+                    return;
+                }
+                const payment = paymentDoc.data();
+                
+                // Update user membership
+                await db.collection('users').doc(userId).update({
+                    membershipPaid: true,
+                    membershipStatus: 'approved',
+                    membershipType: payment.packageName || 'Premium',
+                    membershipExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Update payment status
+                await db.collection('membershipPayments').doc(paymentId).update({
+                    status: 'approved',
+                    approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    approvedBy: currentUser.uid
+                });
+                
+                showToast('✅ Membership approved successfully');
+                loadMemberships(); // Reload the memberships tab
+                
+            } catch (error) {
+                console.error('Error approving membership:', error);
+                showToast('Error approving membership: ' + error.message, true);
+            }
         }
         
         // Reject Membership
         async function rejectMembership(userId, paymentId) {
-            await db.collection('users').doc(userId).update({
-                membershipStatus: 'rejected'
-            });
-            
-            await db.collection('membershipPayments').doc(paymentId).update({
-                status: 'rejected',
-                rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                rejectedBy: currentUser.uid
-            });
-            
-            showToast('Membership rejected');
-            loadMemberships();
+            try {
+                showToast('Processing rejection...');
+                
+                // Update user membership status
+                await db.collection('users').doc(userId).update({
+                    membershipStatus: 'rejected',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Update payment status
+                await db.collection('membershipPayments').doc(paymentId).update({
+                    status: 'rejected',
+                    rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    rejectedBy: currentUser.uid
+                });
+                
+                showToast('Membership rejected');
+                loadMemberships(); // Reload the memberships tab
+                
+            } catch (error) {
+                console.error('Error rejecting membership:', error);
+                showToast('Error rejecting membership: ' + error.message, true);
+            }
+        }
+        
+        // View User Details
+        async function viewUserDetails(userId) {
+            try {
+                const userDoc = await db.collection('users').doc(userId).get();
+                if (!userDoc.exists) {
+                    showToast('User not found', true);
+                    return;
+                }
+                
+                const user = userDoc.data();
+                
+                // Get user's payment history
+                const paymentsSnapshot = await db.collection('membershipPayments')
+                    .where('userId', '==', userId)
+                    .orderBy('submittedAt', 'desc')
+                    .limit(5)
+                    .get();
+                
+                let paymentsHtml = '';
+                paymentsSnapshot.forEach(doc => {
+                    const payment = doc.data();
+                    paymentsHtml += `
+                        <div style="background: #f8fafc; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span><strong>$${payment.amount}</strong></span>
+                                <span class="badge ${payment.status === 'approved' ? 'success' : payment.status === 'pending' ? 'warning' : 'danger'}">${payment.status}</span>
+                            </div>
+                            <small>${payment.submittedAt?.toDate().toLocaleString()}</small>
+                        </div>
+                    `;
+                });
+                
+                showModal(`
+                    <h3 style="margin-bottom:1rem;">User Details</h3>
+                    <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1rem;">
+                        <h4>${user.displayName || 'N/A'}</h4>
+                        <p>${user.email}</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="background: #f8fafc; padding: 1rem; border-radius: 0.5rem; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700;">$${user.wallet || 0}</div>
+                            <div style="color: #64748b;">Wallet Balance</div>
+                        </div>
+                        <div style="background: #f8fafc; padding: 1rem; border-radius: 0.5rem; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700;">${user.tasksCompleted || 0}</div>
+                            <div style="color: #64748b;">Tasks Done</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Membership:</strong> 
+                        <span class="badge ${user.membershipPaid ? 'success' : 'warning'}">
+                            ${user.membershipPaid ? (user.membershipType || 'Premium') : 'Free'}
+                        </span>
+                    </div>
+                    
+                    ${paymentsHtml ? `
+                        <div style="margin-top: 1rem;">
+                            <strong>Recent Payments:</strong>
+                            <div style="margin-top: 0.5rem;">${paymentsHtml}</div>
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn btn-primary" onclick="closeModal()" style="flex: 1;">Close</button>
+                        <button class="btn btn-success" onclick="showAdjustWallet('${userId}', '${user.displayName || user.email}', ${user.wallet || 0})" style="flex: 1;">
+                            Adjust Wallet
+                        </button>
+                    </div>
+                `);
+            } catch (error) {
+                console.error('Error viewing user details:', error);
+                showToast('Error loading user details', true);
+            }
         }
         
         // Load Messages (with broadcast feature)
         async function loadMessages() {
-            const users = await db.collection('users').get();
-            
-            let options = '';
-            users.forEach(doc => {
-                const user = doc.data();
-                options += `<option value="${doc.id}">${user.email} - ${user.displayName}</option>`;
-            });
-            
-            const messages = await db.collection('messages')
-                .orderBy('createdAt', 'desc')
-                .limit(20)
-                .get();
-            
-            let messagesHtml = '';
-            messages.forEach(doc => {
-                const msg = doc.data();
-                const isBroadcast = msg.userId === 'ALL_USERS' || msg.isBroadcast;
-                messagesHtml += `
-                    <div class="submission-card" style="border-left: 4px solid ${isBroadcast ? '#6366f1' : '#10b981'}">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <strong style="color: ${isBroadcast ? '#6366f1' : '#10b981'}">
-                                ${isBroadcast ? '📢 Broadcast to All Users' : `👤 To: ${msg.userEmail || msg.userId}`}
-                            </strong>
-                            <small>${msg.createdAt?.toDate().toLocaleString()}</small>
+            try {
+                const users = await db.collection('users').get();
+                
+                let options = '<option value="">Select User</option>';
+                users.forEach(doc => {
+                    const user = doc.data();
+                    options += `<option value="${doc.id}">${user.email} - ${user.displayName}</option>`;
+                });
+                
+                const messages = await db.collection('messages')
+                    .orderBy('createdAt', 'desc')
+                    .limit(20)
+                    .get();
+                
+                let messagesHtml = '';
+                messages.forEach(doc => {
+                    const msg = doc.data();
+                    const isBroadcast = msg.userId === 'ALL_USERS' || msg.isBroadcast;
+                    messagesHtml += `
+                        <div class="submission-card" style="border-left: 4px solid ${isBroadcast ? '#6366f1' : '#10b981'}">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <strong style="color: ${isBroadcast ? '#6366f1' : '#10b981'}">
+                                    ${isBroadcast ? '📢 Broadcast to All Users' : `👤 To: ${msg.userEmail || msg.userId}`}
+                                </strong>
+                                <small>${msg.createdAt?.toDate().toLocaleString()}</small>
+                            </div>
+                            ${msg.title ? `<h4 style="margin: 0.5rem 0; color: #1f2937;">${msg.title}</h4>` : ''}
+                            <p style="margin: 0.5rem 0;">${msg.message}</p>
+                            ${msg.sentCount ? `<small style="color: #6b7280;">✓ Delivered to ${msg.sentCount} users</small>` : ''}
                         </div>
-                        ${msg.title ? `<h4 style="margin: 0.5rem 0; color: #1f2937;">${msg.title}</h4>` : ''}
-                        <p style="margin: 0.5rem 0;">${msg.message}</p>
-                        ${msg.sentCount ? `<small style="color: #6b7280;">✓ Delivered to ${msg.sentCount} users</small>` : ''}
+                    `;
+                });
+                
+                let html = `
+                    <h3 style="margin-bottom:1.5rem;">Message Center</h3>
+                    
+                    <!-- Toggle between individual and broadcast -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                        <button class="btn ${currentMessageType === 'individual' ? 'btn-primary' : 'btn'}" id="individualMessageBtn">📨 Individual Message</button>
+                        <button class="btn ${currentMessageType === 'broadcast' ? 'btn-primary' : 'btn'}" id="broadcastMessageBtn">📢 Broadcast to All</button>
                     </div>
+                    
+                    <!-- Individual Message Form -->
+                    <div id="individualMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'individual' ? 'block' : 'none'};">
+                        <h4 style="margin-bottom:1rem;">Send Individual Message</h4>
+                        <select id="messageUser">${options}</select>
+                        <textarea id="messageText" placeholder="Type your message..."></textarea>
+                        <button class="btn btn-primary" id="sendMessageBtn">Send Message</button>
+                    </div>
+                    
+                    <!-- Broadcast Message Form -->
+                    <div id="broadcastMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'broadcast' ? 'block' : 'none'};">
+                        <h4 style="margin-bottom:1rem; color: #6366f1;">Send Broadcast to All Users</h4>
+                        <div style="background: #6366f120; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <p style="margin: 0;"><strong>⚠️ Important:</strong> This message will be sent to ALL registered users (${users.size} users total).</p>
+                        </div>
+                        <input type="text" id="broadcastTitle" placeholder="Message Title (Optional)">
+                        <textarea id="broadcastMessage" placeholder="Type your broadcast message..." style="min-height: 120px;"></textarea>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-primary" id="sendBroadcastBtn" style="flex: 1;">
+                                <i class="fas fa-bullhorn"></i> Send Broadcast to All Users
+                            </button>
+                            <button class="btn" id="previewBroadcastBtn">
+                                <i class="fas fa-eye"></i> Preview
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Messages -->
+                    <h4 style="margin-bottom:1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Recent Messages</span>
+                        <span class="badge primary">${messages.size} messages</span>
+                    </h4>
+                    ${messagesHtml || '<p style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 1rem;">No messages yet</p>'}
                 `;
-            });
-            
-            let html = `
-                <h3 style="margin-bottom:1.5rem;">Message Center</h3>
                 
-                <!-- Toggle between individual and broadcast -->
-                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                    <button class="btn ${currentMessageType === 'individual' ? 'btn-primary' : 'btn'}" id="individualMessageBtn">📨 Individual Message</button>
-                    <button class="btn ${currentMessageType === 'broadcast' ? 'btn-primary' : 'btn'}" id="broadcastMessageBtn">📢 Broadcast to All</button>
-                </div>
-                
-                <!-- Individual Message Form -->
-                <div id="individualMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'individual' ? 'block' : 'none'};">
-                    <h4 style="margin-bottom:1rem;">Send Individual Message</h4>
-                    <select id="messageUser">
-                        <option value="">Select User</option>
-                        ${options}
-                    </select>
-                    <textarea id="messageText" placeholder="Type your message..."></textarea>
-                    <button class="btn btn-primary" id="sendMessageBtn">Send Message</button>
-                </div>
-                
-                <!-- Broadcast Message Form -->
-                <div id="broadcastMessageForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: ${currentMessageType === 'broadcast' ? 'block' : 'none'};">
-                    <h4 style="margin-bottom:1rem; color: #6366f1;">Send Broadcast to All Users</h4>
-                    <div style="background: #6366f120; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                        <p style="margin: 0;"><strong>⚠️ Important:</strong> This message will be sent to ALL registered users (${users.size} users total).</p>
-                    </div>
-                    <input type="text" id="broadcastTitle" placeholder="Message Title (Optional)">
-                    <textarea id="broadcastMessage" placeholder="Type your broadcast message..." style="min-height: 120px;"></textarea>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-primary" id="sendBroadcastBtn" style="flex: 1;">
-                            <i class="fas fa-bullhorn"></i> Send Broadcast to All Users
-                        </button>
-                        <button class="btn" id="previewBroadcastBtn">
-                            <i class="fas fa-eye"></i> Preview
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Recent Messages -->
-                <h4 style="margin-bottom:1rem; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Recent Messages</span>
-                    <span class="badge primary">${messages.size} messages</span>
-                </h4>
-                ${messagesHtml || '<p style="text-align: center; padding: 2rem; background: #f8fafc; border-radius: 1rem;">No messages yet</p>'}
-            `;
-            
-            document.getElementById('content').innerHTML = html;
+                document.getElementById('content').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                showToast('Error loading messages', true);
+            }
         }
         
         // Send Individual Message
         async function sendMessage() {
-            const userId = document.getElementById('messageUser').value;
-            const message = document.getElementById('messageText').value;
-            
-            if (!userId) {
-                showToast('Please select a user', true);
-                return;
+            try {
+                const userId = document.getElementById('messageUser').value;
+                const message = document.getElementById('messageText').value;
+                
+                if (!userId) {
+                    showToast('Please select a user', true);
+                    return;
+                }
+                
+                if (!message) {
+                    showToast('Enter message', true);
+                    return;
+                }
+                
+                // Get user email for display
+                const userDoc = await db.collection('users').doc(userId).get();
+                const userEmail = userDoc.data().email;
+                
+                await db.collection('messages').add({
+                    userId,
+                    userEmail,
+                    message,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast('Message sent');
+                document.getElementById('messageText').value = '';
+                loadMessages();
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showToast('Error sending message', true);
             }
-            
-            if (!message) {
-                showToast('Enter message', true);
-                return;
-            }
-            
-            // Get user email for display
-            const userDoc = await db.collection('users').doc(userId).get();
-            const userEmail = userDoc.data().email;
-            
-            await db.collection('messages').add({
-                userId,
-                userEmail,
-                message,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            showToast('Message sent');
-            document.getElementById('messageText').value = '';
-            loadMessages();
         }
         
         // Send Broadcast Message
@@ -1378,7 +1536,12 @@
             if (target.classList.contains('approve-membership')) {
                 const userId = target.getAttribute('data-user-id');
                 const paymentId = target.getAttribute('data-payment-id');
-                await approveMembership(userId, paymentId);
+                if (userId && paymentId) {
+                    await approveMembership(userId, paymentId);
+                } else {
+                    console.error('Missing userId or paymentId');
+                    showToast('Error: Missing user or payment information', true);
+                }
                 return;
             }
             
@@ -1386,7 +1549,21 @@
             if (target.classList.contains('reject-membership')) {
                 const userId = target.getAttribute('data-user-id');
                 const paymentId = target.getAttribute('data-payment-id');
-                await rejectMembership(userId, paymentId);
+                if (userId && paymentId) {
+                    await rejectMembership(userId, paymentId);
+                } else {
+                    console.error('Missing userId or paymentId');
+                    showToast('Error: Missing user or payment information', true);
+                }
+                return;
+            }
+            
+            // View User Details
+            if (target.classList.contains('view-user-details')) {
+                const userId = target.getAttribute('data-user-id');
+                if (userId) {
+                    await viewUserDetails(userId);
+                }
                 return;
             }
             
@@ -1399,20 +1576,34 @@
             // Individual Message button
             if (target.id === 'individualMessageBtn') {
                 currentMessageType = 'individual';
-                document.getElementById('individualMessageForm').style.display = 'block';
-                document.getElementById('broadcastMessageForm').style.display = 'none';
+                const individualForm = document.getElementById('individualMessageForm');
+                const broadcastForm = document.getElementById('broadcastMessageForm');
+                if (individualForm && broadcastForm) {
+                    individualForm.style.display = 'block';
+                    broadcastForm.style.display = 'none';
+                }
                 target.classList.add('btn-primary');
-                document.getElementById('broadcastMessageBtn').classList.remove('btn-primary');
+                const broadcastBtn = document.getElementById('broadcastMessageBtn');
+                if (broadcastBtn) {
+                    broadcastBtn.classList.remove('btn-primary');
+                }
                 return;
             }
             
             // Broadcast Message button
             if (target.id === 'broadcastMessageBtn') {
                 currentMessageType = 'broadcast';
-                document.getElementById('broadcastMessageForm').style.display = 'block';
-                document.getElementById('individualMessageForm').style.display = 'none';
+                const individualForm = document.getElementById('individualMessageForm');
+                const broadcastForm = document.getElementById('broadcastMessageForm');
+                if (individualForm && broadcastForm) {
+                    broadcastForm.style.display = 'block';
+                    individualForm.style.display = 'none';
+                }
                 target.classList.add('btn-primary');
-                document.getElementById('individualMessageBtn').classList.remove('btn-primary');
+                const individualBtn = document.getElementById('individualMessageBtn');
+                if (individualBtn) {
+                    individualBtn.classList.remove('btn-primary');
+                }
                 return;
             }
             
@@ -1470,6 +1661,7 @@
         window.updatePackage = updatePackage;
         window.deletePackage = deletePackage;
         window.togglePackage = togglePackage;
+        window.viewUserDetails = viewUserDetails;
     </script>
 </body>
 </html>
