@@ -1222,7 +1222,7 @@
                     </div>  
                 `;  
                 
-                // Check if collections exist and create them if they don't  
+                // Check if collections exist
                 await initializeReferralCollections();  
                 
                 // Get all referrals  
@@ -1233,7 +1233,6 @@
                         .get();  
                 } catch (error) {  
                     console.warn('Error fetching referrals, collection might not exist:', error);  
-                    // If collection doesn't exist, treat as empty  
                     snapshot = { empty: true, docs: [] };  
                 }  
                 
@@ -1261,16 +1260,26 @@
                         </div>  
                     `;  
                 } else {  
-                    // Group by status  
+                    // Group by status - FIXED: Handle undefined, null, or missing status
                     const pending = [];  
                     const completed = [];  
                     const rejected = [];  
+                    const unknown = []; // For referrals with no status
                     
                     snapshot.forEach(doc => {  
                         const referral = { id: doc.id, ...doc.data() };  
-                        if (referral.status === 'pending') pending.push(referral);  
-                        else if (referral.status === 'completed') completed.push(referral);  
-                        else rejected.push(referral);  
+                        
+                        // Default to 'pending' if status is missing
+                        const status = referral.status || 'pending';
+                        
+                        if (status === 'pending') pending.push(referral);  
+                        else if (status === 'completed') completed.push(referral);  
+                        else if (status === 'rejected') rejected.push(referral);  
+                        else {
+                            // Any other status, treat as pending and show warning
+                            console.warn('Referral with unknown status:', referral);
+                            pending.push({...referral, status: 'pending'}); // Force to pending
+                        }
                     });  
                     
                     // Pending referrals section  
@@ -1281,10 +1290,12 @@
                             try {  
                                 // Get referrer info  
                                 let referrerEmail = 'Unknown';  
+                                let referrerName = 'Unknown';
                                 try {  
                                     const referrerDoc = await db.collection('users').doc(referral.referrerId).get();  
                                     if (referrerDoc.exists) {  
                                         referrerEmail = referrerDoc.data().email;  
+                                        referrerName = referrerDoc.data().displayName || referrerEmail;
                                     }  
                                 } catch (e) {  
                                     console.warn('Could not fetch referrer:', e);  
@@ -1292,10 +1303,12 @@
                                 
                                 // Get referred user info  
                                 let referredName = 'Unknown';  
+                                let referredMembership = 'basic';
                                 try {  
                                     const referredDoc = await db.collection('users').doc(referral.referredId).get();  
                                     if (referredDoc.exists) {  
                                         referredName = referredDoc.data().displayName || referredDoc.data().email;  
+                                        referredMembership = referredDoc.data().membershipType || 'basic';
                                     }  
                                 } catch (e) {  
                                     console.warn('Could not fetch referred user:', e);  
@@ -1304,11 +1317,18 @@
                                 const createdDate = referral.createdAt?.seconds ?   
                                     new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
                                 
+                                // Check if referred user has upgraded to premium
+                                const hasUpgraded = referredMembership === 'premium' || referredMembership === 'elite';
+                                
                                 html += `  
                                     <div class="referral-card pending">  
                                         <div class="referral-header">  
                                             <div>  
                                                 <span class="badge warning">Pending</span>  
+                                                ${hasUpgraded ? 
+                                                    `<span class="badge success" style="margin-left: 0.5rem;">Upgraded to ${referredMembership}</span>` : 
+                                                    `<span class="badge info" style="margin-left: 0.5rem;">Not Upgraded</span>`
+                                                }  
                                                 <span class="referral-amount" style="margin-left: 1rem;">  
                                                     <i class="fas fa-gift"></i> $${REFERRAL_BONUS_REFERRER + REFERRAL_BONUS_REFERRED} total  
                                                 </span>  
@@ -1350,18 +1370,24 @@
                                             </div>  
                                         </div>  
                                         
-                                        <div class="flex-row" style="margin-top: 1rem;">  
-                                            <button class="btn btn-success credit-referral-btn"   
-                                                    data-referral-id="${referral.id}"  
-                                                    data-referrer-id="${referral.referrerId}"  
-                                                    data-referred-id="${referral.referredId}"  
-                                                    data-referred-email="${referral.referredEmail}">  
-                                                <i class="fas fa-check-circle"></i> Credit Bonuses  
-                                            </button>  
-                                            <button class="btn btn-danger reject-referral-btn" data-referral-id="${referral.id}">  
-                                                <i class="fas fa-times-circle"></i> Reject  
-                                            </button>  
-                                        </div>  
+                                        ${hasUpgraded ? `
+                                            <div class="flex-row" style="margin-top: 1rem;">  
+                                                <button class="btn btn-success credit-referral-btn"   
+                                                        data-referral-id="${referral.id}"  
+                                                        data-referrer-id="${referral.referrerId}"  
+                                                        data-referred-id="${referral.referredId}"  
+                                                        data-referred-email="${referral.referredEmail}">  
+                                                    <i class="fas fa-check-circle"></i> Credit Bonuses  
+                                                </button>  
+                                                <button class="btn btn-danger reject-referral-btn" data-referral-id="${referral.id}">  
+                                                    <i class="fas fa-times-circle"></i> Reject  
+                                                </button>  
+                                            </div>  
+                                        ` : `
+                                            <div style="margin-top: 1rem; padding: 0.5rem; background: #f1f5f9; border-radius: 0.5rem; text-align: center;">  
+                                                <p style="margin: 0; color: #64748b;">⏳ Waiting for referred user to upgrade to Premium</p>  
+                                            </div>  
+                                        `}  
                                     </div>  
                                 `;  
                             } catch (e) {  
@@ -1450,11 +1476,13 @@
                         }  
                     }  
                     
-                    // If all sections are empty but there are referrals (shouldn't happen, but just in case)  
-                    if (pending.length === 0 && completed.length === 0 && rejected.length === 0 && !snapshot.empty) {  
+                    // If there are unknown referrals that we forced to pending, show a note
+                    if (unknown.length > 0) {  
                         html += `  
-                            <div style="text-align: center; padding: 2rem;">  
-                                <p>There are ${snapshot.size} referrals but they couldn't be categorized.</p>  
+                            <div style="margin-top: 1rem; padding: 0.5rem; background: #f1f5f9; border-radius: 0.5rem;">  
+                                <p style="margin: 0; color: #64748b; font-size: 0.9rem;">  
+                                    <i class="fas fa-info-circle"></i> ${unknown.length} referral(s) with missing status have been shown in Pending section.  
+                                </p>  
                             </div>  
                         `;  
                     }  
