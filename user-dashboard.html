@@ -13,6 +13,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Keep all your existing styles - they remain the same */
         * { 
             margin: 0; 
             padding: 0; 
@@ -31,7 +32,6 @@
             padding: 1rem; 
         }
         
-        /* Header */
         .header { 
             background: white; 
             border-radius: 2rem; 
@@ -83,7 +83,6 @@
             padding: 0.5rem; 
         }
         
-        /* Hamburger Menu Styles */
         .hamburger-menu {
             display: none;
             font-size: 1.8rem;
@@ -177,7 +176,6 @@
             display: block;
         }
         
-        /* Stats Grid */
         .stats-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
@@ -219,7 +217,6 @@
             letter-spacing: 0.5px;
         }
         
-        /* Tabs */
         .tabs { 
             display: flex; 
             gap: 0.5rem; 
@@ -243,7 +240,6 @@
             color: white; 
         }
         
-        /* Content area */
         .content { 
             background: white; 
             border-radius: 2rem; 
@@ -251,14 +247,12 @@
             min-height: 500px; 
         }
         
-        /* Task Grid */
         .task-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
             gap: 1.8rem; 
         }
         
-        /* Regular Task Cards */
         .task-card:nth-child(odd) { 
             background: #f8fafc; 
             border-left: 4px solid #6366f1;
@@ -289,7 +283,6 @@
             line-height: 1.3;
         }
         
-        /* Client info */
         .client-info {
             display: flex;
             align-items: center;
@@ -308,7 +301,6 @@
             font-size: 0.9rem;
         }
         
-        /* Deadline badge */
         .deadline-badge {
             display: flex;
             align-items: center;
@@ -354,7 +346,6 @@
             letter-spacing: -0.5px;
         }
         
-        /* Expired message */
         .expired-message {
             background: #fee2e2;
             color: #ef4444;
@@ -366,7 +357,6 @@
             margin-top: 0.5rem;
         }
         
-        /* Badges */
         .badge { 
             padding: 0.4rem 1.2rem; 
             border-radius: 40px; 
@@ -396,7 +386,6 @@
             color: #ef4444; 
         }
         
-        /* Buttons */
         .btn { 
             padding: 0.9rem 1.8rem; 
             border: none; 
@@ -672,7 +661,6 @@
             color: #10b981;
         }
         
-        /* Current membership badge */
         .current-membership {
             background: #f0fdf4;
             border: 2px solid #10b981;
@@ -701,7 +689,7 @@
             font-weight: 600;
         }
         
-        /* Referral Section */
+        /* Referral Section - User View */
         .referral-section {
             background: linear-gradient(145deg, #f0f9ff, #e6f2ff);
             border-radius: 1.5rem;
@@ -850,7 +838,15 @@
             font-weight: 600;
         }
         
-        /* Withdrawal section */
+        .status-badge {
+            background: #f59e0b20;
+            color: #f59e0b;
+            padding: 0.2rem 0.5rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
         .withdrawal-section {
             background: #f8fafc;
             border-radius: 1.5rem;
@@ -898,7 +894,6 @@
             font-weight: 600;
         }
         
-        /* Fee breakdown */
         .fee-breakdown {
             background: #f1f5f9;
             border-radius: 1rem;
@@ -962,7 +957,6 @@
             color: #10b981;
         }
         
-        /* Submission cards */
         .submission-card { 
             background: #f8fafc; 
             border-radius: 1rem; 
@@ -971,7 +965,6 @@
             border: 1px solid #e2e8f0; 
         }
         
-        /* Empty state */
         .empty-state { 
             text-align: center; 
             padding: 3rem; 
@@ -984,7 +977,6 @@
             margin-bottom: 1rem; 
         }
         
-        /* Loading */
         .loading { 
             text-align: center; 
             padding: 3rem; 
@@ -997,7 +989,6 @@
             color: #6366f1; 
         }
         
-        /* Modal */
         .modal { 
             display: none; 
             position: fixed; 
@@ -1007,7 +998,7 @@
             background: white; 
             border-radius: 1rem; 
             padding: 0;
-            max-width: 500px; 
+            max-width: 600px; 
             width: 95%; 
             z-index: 1000; 
             max-height: 90vh; 
@@ -1037,7 +1028,6 @@
             padding: 2rem;
         }
         
-        /* PDF Document Styles */
         .pdf-document {
             background: white;
             font-family: 'Inter', sans-serif;
@@ -1280,7 +1270,6 @@
             background: #e2e8f0;
         }
         
-        /* Alert Dialog */
         .alert-dialog {
             position: fixed;
             top: 50%;
@@ -1358,7 +1347,6 @@
             display: block;
         }
         
-        /* Message thread */
         .message-thread {
             max-height: 500px;
             overflow-y: auto;
@@ -1484,7 +1472,6 @@
             margin-top: 0.3rem;
         }
         
-        /* Inputs */
         input, textarea, select { 
             width: 100%; 
             padding: 1rem; 
@@ -1517,7 +1504,6 @@
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
         }
         
-        /* Typography */
         h3 {
             font-size: 1.8rem;
             font-weight: 800;
@@ -1539,7 +1525,6 @@
             color: #334155;
         }
         
-        /* Task detail items */
         .task-detail-item { 
             margin-bottom: 1rem; 
             padding: 0.8rem; 
@@ -1558,7 +1543,6 @@
             font-size: 1rem; 
         }
         
-        /* Premium badge */
         .premium-badge { 
             background: linear-gradient(135deg, #f59e0b, #fbbf24); 
             color: white; 
@@ -1578,7 +1562,6 @@
             display: inline-block; 
         }
         
-        /* Responsive */
         @media (max-width: 768px) { 
             .tabs {
                 display: none;
@@ -1793,7 +1776,7 @@
         
         const ELITE_BONUS = 10;
         
-        // Referral constants
+        // Referral constants - amounts that admin will credit
         const REFERRAL_BONUS_REFERRER = 2; // $2 for referrer when referred upgrades to premium
         const REFERRAL_BONUS_REFERRED = 0.5; // $0.5 for referred when they upgrade to premium
         
@@ -2064,6 +2047,17 @@
                         referralEarnings: 0,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
+                    
+                    // Create referral record if they were referred
+                    if (referredBy) {
+                        await db.collection('referrals').add({
+                            referrerId: referredBy,
+                            referredId: user.uid,
+                            referredEmail: user.email,
+                            status: 'pending',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
                     
                     const newDoc = await db.collection('users').doc(user.uid).get();
                     userData = { id: user.uid, ...newDoc.data() };
@@ -2974,7 +2968,7 @@
             }
         }
         
-        // Load Referrals
+        // Load Referrals - User view only
         async function loadReferrals() {
             try {
                 document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading referrals...</p></div>';
@@ -2985,17 +2979,27 @@
                 const referralLink = getReferralLink();
                 
                 // Get referred users
-                const referredSnapshot = await db.collection('users')
-                    .where('referredBy', '==', currentUser.uid)
-                    .get();
-                
-                const totalReferrals = referredSnapshot.size;
+                let referredSnapshot = { empty: true, docs: [] };
+                try {
+                    referredSnapshot = await db.collection('users')
+                        .where('referredBy', '==', currentUser.uid)
+                        .get();
+                } catch (error) {
+                    console.warn('Could not fetch referred users:', error);
+                }
                 
                 // Get referral bonuses
-                const bonusesSnapshot = await db.collection('referralBonuses')
-                    .where('referrerId', '==', currentUser.uid)
-                    .orderBy('createdAt', 'desc')
-                    .get();
+                let bonusesSnapshot = { empty: true, docs: [] };
+                try {
+                    bonusesSnapshot = await db.collection('referralBonuses')
+                        .where('referrerId', '==', currentUser.uid)
+                        .orderBy('createdAt', 'desc')
+                        .get();
+                } catch (error) {
+                    console.warn('Could not fetch referral bonuses:', error);
+                }
+                
+                const totalReferrals = referredSnapshot.size;
                 
                 let totalEarned = 0;
                 const bonuses = [];
@@ -3008,8 +3012,12 @@
                     });
                 }
                 
+                // Update user's referral stats in local data
+                userData.totalReferrals = totalReferrals;
+                userData.referralEarnings = totalEarned;
+                
                 // Build referral stats
-                const statsHtml = `
+                let statsHtml = `
                     <div class="referral-section">
                         <div class="referral-header">
                             <i class="fas fa-users"></i>
@@ -3071,7 +3079,7 @@
                                         <th>Email</th>
                                         <th>Joined</th>
                                         <th>Status</th>
-                                        <th>Your Bonus</th>
+                                        <th>Bonus Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -3083,7 +3091,7 @@
                             new Date(referred.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
                         
                         // Check if this referral has earned a bonus
-                        const bonusEarned = bonuses.find(b => b.referredId === doc.id);
+                        const bonusEarned = bonuses.find(b => b.referredId === doc.id && b.type === 'referrer');
                         
                         const status = referred.membershipType === MEMBERSHIP_TYPES.PREMIUM ? 
                             '<span class="badge primary">Premium</span>' : 
@@ -3091,12 +3099,19 @@
                             '<span class="badge warning">Elite</span>' :
                             '<span class="badge">Basic</span>';
                         
+                        let bonusStatus = '-';
+                        if (bonusEarned) {
+                            bonusStatus = `<span class="commission-badge">$${bonusEarned.amount.toFixed(2)} paid</span>`;
+                        } else if (referred.membershipType === MEMBERSHIP_TYPES.PREMIUM) {
+                            bonusStatus = '<span class="status-badge">Pending approval</span>';
+                        }
+                        
                         referralsHtml += `
                             <tr>
                                 <td>${referred.email}</td>
                                 <td>${joinedDate}</td>
                                 <td>${status}</td>
-                                <td>${bonusEarned ? `<span class="commission-badge">$${bonusEarned.amount.toFixed(2)} earned</span>` : '-'}</td>
+                                <td>${bonusStatus}</td>
                             </tr>
                         `;
                     }
@@ -3119,8 +3134,9 @@
                     `;
                     
                     bonuses.forEach(bonus => {
-                        const date = bonus.createdAt?.seconds ? 
-                            new Date(bonus.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
+                        const date = bonus.creditedAt?.seconds ? 
+                            new Date(bonus.creditedAt.seconds * 1000).toLocaleDateString() : 
+                            bonus.createdAt?.seconds ? new Date(bonus.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';
                         
                         bonusHtml += `
                             <div class="submission-card" style="padding: 1rem;">
@@ -3139,14 +3155,27 @@
                 
                 document.getElementById('content').innerHTML = statsHtml + referralsHtml + bonusHtml;
                 
+                // Update user document with latest stats
+                try {
+                    await db.collection('users').doc(currentUser.uid).update({
+                        totalReferrals: totalReferrals,
+                        referralEarnings: totalEarned
+                    });
+                } catch (error) {
+                    console.warn('Could not update referral stats:', error);
+                }
+                
             } catch (error) {
                 console.error('Error loading referrals:', error);
+                
                 document.getElementById('content').innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i>
                         <h4>Error Loading Referrals</h4>
                         <p>${error.message}</p>
-                        <button class="btn btn-primary" onclick="loadReferrals()" style="margin-top:1rem;">Try Again</button>
+                        <button class="btn btn-primary" onclick="loadReferrals()" style="margin-top:1rem;">
+                            <i class="fas fa-sync-alt"></i> Try Again
+                        </button>
                     </div>
                 `;
             }
