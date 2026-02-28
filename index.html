@@ -13,6 +13,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Your existing styles remain exactly the same */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: linear-gradient(145deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .auth-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 2rem; padding: 2.5rem; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
@@ -37,7 +38,7 @@
         .link a { color: #667eea; text-decoration: none; font-weight: 600; cursor: pointer; }
         .info-text { text-align: center; color: #64748b; margin: 1rem 0; font-size: 0.9rem; }
         
-        /* NEW: Referrer Message Style */
+        /* Referrer Message Style */
         .referrer-message {
             background: linear-gradient(135deg, #667eea20, #764ba220);
             border-left: 4px solid #667eea;
@@ -164,6 +165,16 @@
         .overlay.show {
             display: block;
         }
+        
+        /* New URL info style */
+        .url-info {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            border-top: 1px dashed #e2e8f0;
+        }
     </style>
 </head>
 <body>
@@ -177,8 +188,8 @@
             <button class="tab" onclick="switchTab('register')">Register</button>
         </div>
         
-        <!-- NEW: Referrer Message Container -->
-        <div id="referrerMessage" style="display: none;"></div>
+        <!-- Referrer Message Container -->
+        <div id="referrerMessageContainer"></div>
         
         <!-- Login Form -->
         <div id="loginForm" class="form">
@@ -259,43 +270,85 @@
         
         let currentUser = null;
         
-        // Generate referral code from user ID (same function as dashboard)
+        // Generate referral code from user ID
         function generateReferralCode(userId) {
             return userId.substring(0, 8).toUpperCase();
         }
         
-        // NEW: Check for referrer on page load
-        async function checkForReferrer() {
+        // NEW: Get referral code from clean URL or query parameter
+        function getReferralCodeFromUrl() {
+            // First check query parameters (backward compatibility)
             const urlParams = new URLSearchParams(window.location.search);
-            const referralCode = urlParams.get('ref');
+            const queryRef = urlParams.get('ref');
+            
+            if (queryRef) {
+                return queryRef;
+            }
+            
+            // Then check for clean URL patterns like /register/CODE or /join/CODE
+            const path = window.location.pathname;
+            
+            // Match patterns: /register/CODE, /join/CODE, /signup/CODE, /ref/CODE, /r/CODE
+            const cleanUrlMatch = path.match(/\/(?:register|join|signup|ref|r)\/([a-zA-Z0-9_-]+)/i);
+            
+            if (cleanUrlMatch && cleanUrlMatch[1]) {
+                return cleanUrlMatch[1];
+            }
+            
+            // Also check for just /CODE at the end (if page is at root)
+            // This would match yoursite.com/CODE
+            if (path.split('/').length === 2 && path !== '/') {
+                const possibleCode = path.substring(1); // Remove leading slash
+                // Only treat as code if it looks like a referral code (alphanumeric, reasonable length)
+                if (possibleCode.length >= 4 && possibleCode.length <= 20 && /^[a-zA-Z0-9_-]+$/.test(possibleCode)) {
+                    return possibleCode;
+                }
+            }
+            
+            return null;
+        }
+        
+        // Check for referrer on page load
+        async function checkForReferrer() {
+            const referralCode = getReferralCodeFromUrl();
             
             if (referralCode) {
+                console.log('Referral code detected:', referralCode); // For debugging
+                
+                // Store referral code in session storage for later use
+                sessionStorage.setItem('pendingReferral', referralCode);
+                
+                // Try to get referrer name
                 try {
                     const usersSnapshot = await db.collection('users').get();
-                    let referrerName = null;
+                    let found = false;
                     
                     for (const userDoc of usersSnapshot.docs) {
                         const userCode = generateReferralCode(userDoc.id);
                         if (userCode === referralCode) {
-                            referrerName = userDoc.data().displayName || 'A NextGen user';
+                            const referrerName = userDoc.data().displayName || 'A NextGen user';
+                            showReferrerMessage(referrerName);
+                            found = true;
                             break;
                         }
                     }
                     
-                    if (referrerName) {
-                        showReferrerMessage(referrerName);
+                    if (!found) {
+                        // Still show generic message if code is present but user not found
+                        showReferrerMessage('a NextGen user');
                     }
                 } catch (error) {
-                    console.error('Error finding referrer:', error);
+                    console.log('Could not fetch referrer name, but referral code saved');
+                    // Still show a generic message
+                    showReferrerMessage('a NextGen user');
                 }
             }
         }
         
-        // NEW: Show referrer message with $0.5 bonus info
+        // Show referrer message
         function showReferrerMessage(name) {
-            const messageDiv = document.getElementById('referrerMessage');
-            messageDiv.style.display = 'block';
-            messageDiv.innerHTML = `
+            const container = document.getElementById('referrerMessageContainer');
+            container.innerHTML = `
                 <div class="referrer-message">
                     <i class="fas fa-user-plus"></i>
                     <div>
@@ -376,24 +429,31 @@
                 const cred = await auth.createUserWithEmailAndPassword(email, password);
                 await cred.user.sendEmailVerification();
                 
-                // Check for referrer in URL
-                const urlParams = new URLSearchParams(window.location.search);
-                const referralCode = urlParams.get('ref');
+                // Check for referrer in session storage
+                const referralCode = sessionStorage.getItem('pendingReferral');
                 let referredBy = null;
                 
                 if (referralCode) {
-                    const usersSnapshot = await db.collection('users').get();
-                    for (const userDoc of usersSnapshot.docs) {
-                        const userCode = generateReferralCode(userDoc.id);
-                        if (userCode === referralCode) {
-                            referredBy = userDoc.id;
-                            break;
+                    try {
+                        // Try to find the referrer
+                        const usersSnapshot = await db.collection('users').get();
+                        for (const userDoc of usersSnapshot.docs) {
+                            const userCode = generateReferralCode(userDoc.id);
+                            if (userCode === referralCode) {
+                                referredBy = userDoc.id;
+                                break;
+                            }
                         }
+                    } catch (error) {
+                        console.log('Could not verify referrer, but will try to save referral code');
                     }
+                    
+                    // Clear the pending referral
+                    sessionStorage.removeItem('pendingReferral');
                 }
                 
-                // Create user document with referral info
-                await db.collection('users').doc(cred.user.uid).set({
+                // Create user document
+                const userData = {
                     email,
                     displayName: name,
                     phone: phone || '',
@@ -401,28 +461,43 @@
                     wallet: 0,
                     active: true,
                     verified: false,
+                    membershipType: 'basic',
                     membershipPaid: false,
                     membershipStatus: 'pending',
-                    referredBy: referredBy,
+                    totalFeesPaid: 0,
+                    unreadMessages: 0,
                     totalReferrals: 0,
                     referralEarnings: 0,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                
+                // Add referredBy if exists
+                if (referredBy) {
+                    userData.referredBy = referredBy;
+                }
+                
+                await db.collection('users').doc(cred.user.uid).set(userData);
                 
                 // Create referral record if they were referred
                 if (referredBy) {
-                    await db.collection('referrals').add({
-                        referrerId: referredBy,
-                        referredId: cred.user.uid,
-                        referredEmail: email,
-                        status: 'pending',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    try {
+                        await db.collection('referrals').add({
+                            referrerId: referredBy,
+                            referredId: cred.user.uid,
+                            referredEmail: email,
+                            referredName: name,
+                            status: 'pending',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } catch (error) {
+                        console.log('Referral record creation failed, but user was created');
+                    }
                 }
                 
                 showVerifyView(email);
                 showAlert('Verification email sent!', 'success');
             } catch (error) {
+                console.error('Registration error:', error);
                 showAlert(error.message, 'error');
             }
         }
@@ -455,23 +530,28 @@
                 const userDoc = await userRef.get();
                 
                 if (!userDoc.exists) {
-                    // Check for referrer in URL
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const referralCode = urlParams.get('ref');
+                    // Check for referrer in session storage
+                    const referralCode = sessionStorage.getItem('pendingReferral');
                     let referredBy = null;
                     
                     if (referralCode) {
-                        const usersSnapshot = await db.collection('users').get();
-                        for (const userDoc of usersSnapshot.docs) {
-                            const userCode = generateReferralCode(userDoc.id);
-                            if (userCode === referralCode) {
-                                referredBy = userDoc.id;
-                                break;
+                        try {
+                            const usersSnapshot = await db.collection('users').get();
+                            for (const userDoc of usersSnapshot.docs) {
+                                const userCode = generateReferralCode(userDoc.id);
+                                if (userCode === referralCode) {
+                                    referredBy = userDoc.id;
+                                    break;
+                                }
                             }
+                        } catch (error) {
+                            console.log('Could not verify referrer for Google sign-up');
                         }
+                        
+                        sessionStorage.removeItem('pendingReferral');
                     }
                     
-                    await userRef.set({
+                    const userData = {
                         email: user.email,
                         displayName: user.displayName,
                         phone: '',
@@ -479,23 +559,35 @@
                         wallet: 0,
                         active: true,
                         verified: true,
+                        membershipType: 'basic',
                         membershipPaid: false,
                         membershipStatus: 'pending',
-                        referredBy: referredBy,
+                        totalFeesPaid: 0,
+                        unreadMessages: 0,
                         totalReferrals: 0,
                         referralEarnings: 0,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    };
                     
-                    // Create referral record if they were referred
                     if (referredBy) {
-                        await db.collection('referrals').add({
-                            referrerId: referredBy,
-                            referredId: user.uid,
-                            referredEmail: user.email,
-                            status: 'pending',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        userData.referredBy = referredBy;
+                    }
+                    
+                    await userRef.set(userData);
+                    
+                    if (referredBy) {
+                        try {
+                            await db.collection('referrals').add({
+                                referrerId: referredBy,
+                                referredId: user.uid,
+                                referredEmail: user.email,
+                                referredName: user.displayName,
+                                status: 'pending',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } catch (error) {
+                            console.log('Referral record creation failed for Google user');
+                        }
                     }
                 }
             } catch (error) {
@@ -534,21 +626,25 @@
                     return;
                 }
                 
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    
-                    if (userData.active === false) {
-                        await auth.signOut();
-                        showAlert('Account deactivated', 'error');
-                        return;
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        
+                        if (userData.active === false) {
+                            await auth.signOut();
+                            showAlert('Account deactivated', 'error');
+                            return;
+                        }
+                        
+                        if (userData.role === 'admin') {
+                            window.location.href = 'admin-dashboard.html';
+                        } else {
+                            window.location.href = 'user-dashboard.html';
+                        }
                     }
-                    
-                    if (userData.role === 'admin') {
-                        window.location.href = 'admin-dashboard.html';
-                    } else {
-                        window.location.href = 'user-dashboard.html';
-                    }
+                } catch (error) {
+                    console.error('Error checking user data:', error);
                 }
             }
         });
