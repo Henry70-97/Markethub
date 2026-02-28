@@ -520,9 +520,14 @@
                 .where('status', '==', 'pending')  
                 .get();  
                 
-            const pendingReferrals = await db.collection('referrals')  
-                .where('status', '==', 'pending')  
-                .get();  
+            let pendingReferrals = { size: 0 };  
+            try {  
+                pendingReferrals = await db.collection('referrals')  
+                    .where('status', '==', 'pending')  
+                    .get();  
+            } catch (error) {  
+                console.warn('Could not fetch pending referrals:', error);  
+            }  
               
             document.getElementById('statsGrid').innerHTML = `  
                 <div class="stat-card">  
@@ -1152,13 +1157,85 @@
             loadMemberships();  
         }  
 
-        // Load Referrals  
+        // Initialize referral collections if they don't exist
+        async function initializeReferralCollections() {
+            try {
+                // Check if referrals collection exists by trying to get a document
+                const testQuery = await db.collection('referrals').limit(1).get();
+                console.log('Referrals collection exists');
+            } catch (error) {
+                console.log('Referrals collection does not exist yet, will be created when needed');
+                // Collection will be created automatically when first document is added
+            }
+            
+            try {
+                // Check if referralBonuses collection exists
+                const testQuery2 = await db.collection('referralBonuses').limit(1).get();
+                console.log('ReferralBonuses collection exists');
+            } catch (error) {
+                console.log('ReferralBonuses collection does not exist yet, will be created when needed');
+            }
+        }
+
+        // Create sample referral data for testing (optional)
+        async function createSampleReferral() {
+            try {
+                showAlert('Creating sample referral data...', 'info', 'Please Wait');
+                
+                // Get first two users
+                const usersSnapshot = await db.collection('users').limit(2).get();
+                
+                if (usersSnapshot.size < 2) {
+                    showAlert('Need at least 2 users to create a sample referral', 'error');
+                    return;
+                }
+                
+                const users = [];
+                usersSnapshot.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
+                
+                // Create a sample referral
+                await db.collection('referrals').add({
+                    referrerId: users[0].id,
+                    referredId: users[1].id,
+                    referredEmail: users[1].email,
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showAlert('Sample referral created successfully!', 'success');
+                loadReferrals();
+                
+            } catch (error) {
+                console.error('Error creating sample referral:', error);
+                showAlert('Error creating sample referral: ' + error.message, 'error');
+            }
+        }
+
+        // Load Referrals with graceful error handling  
         async function loadReferrals() {  
             try {  
+                document.getElementById('content').innerHTML = `  
+                    <div style="text-align: center; padding: 3rem;">  
+                        <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: #6366f1; margin-bottom: 1rem;"></i>  
+                        <h3>Loading Referrals...</h3>  
+                        <p style="color: #64748b;">Please wait while we fetch the referral data.</p>  
+                    </div>  
+                `;  
+                
+                // Check if collections exist and create them if they don't  
+                await initializeReferralCollections();  
+                
                 // Get all referrals  
-                const snapshot = await db.collection('referrals')  
-                    .orderBy('createdAt', 'desc')  
-                    .get();  
+                let snapshot;  
+                try {  
+                    snapshot = await db.collection('referrals')  
+                        .orderBy('createdAt', 'desc')  
+                        .get();  
+                } catch (error) {  
+                    console.warn('Error fetching referrals, collection might not exist:', error);  
+                    // If collection doesn't exist, treat as empty  
+                    snapshot = { empty: true, docs: [] };  
+                }  
                 
                 let html = `  
                     <h3 style="margin-bottom:1.5rem;">Referral Management</h3>  
@@ -1171,8 +1248,18 @@
                     </div>  
                 `;  
                 
-                if (snapshot.empty) {  
-                    html += '<p>No referrals found.</p>';  
+                if (!snapshot || snapshot.empty) {  
+                    html += `  
+                        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: 1rem;">  
+                            <i class="fas fa-users" style="font-size: 4rem; color: #94a3b8; margin-bottom: 1rem;"></i>  
+                            <h4 style="color: #1e293b; margin-bottom: 0.5rem;">No Referrals Found</h4>  
+                            <p style="color: #64748b;">There are no referrals in the system yet.</p>  
+                            <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 1rem;">When users sign up using referral links, they will appear here.</p>  
+                            <button class="btn btn-success" onclick="createSampleReferral()" style="margin-top: 1rem;">  
+                                <i class="fas fa-flask"></i> Create Sample Data  
+                            </button>  
+                        </div>  
+                    `;  
                 } else {  
                     // Group by status  
                     const pending = [];  
@@ -1191,77 +1278,96 @@
                         html += '<h4 style="margin: 2rem 0 1rem 0; color: #f59e0b;">Pending Referrals ⏳</h4>';  
                         
                         for (const referral of pending) {  
-                            // Get referrer info  
-                            const referrerDoc = await db.collection('users').doc(referral.referrerId).get();  
-                            const referrer = referrerDoc.data();  
-                            
-                            // Get referred user info  
-                            const referredDoc = await db.collection('users').doc(referral.referredId).get();  
-                            const referred = referredDoc.data();  
-                            
-                            const createdDate = referral.createdAt?.seconds ?   
-                                new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
-                            
-                            html += `  
-                                <div class="referral-card pending">  
-                                    <div class="referral-header">  
-                                        <div>  
-                                            <span class="badge warning">Pending</span>  
-                                            <span class="referral-amount" style="margin-left: 1rem;">  
-                                                <i class="fas fa-gift"></i> $${REFERRAL_BONUS_REFERRER + REFERRAL_BONUS_REFERRED} total  
-                                            </span>  
-                                        </div>  
-                                    </div>  
-                                    
-                                    <div class="referral-details">  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-user"></i>  
+                            try {  
+                                // Get referrer info  
+                                let referrerEmail = 'Unknown';  
+                                try {  
+                                    const referrerDoc = await db.collection('users').doc(referral.referrerId).get();  
+                                    if (referrerDoc.exists) {  
+                                        referrerEmail = referrerDoc.data().email;  
+                                    }  
+                                } catch (e) {  
+                                    console.warn('Could not fetch referrer:', e);  
+                                }  
+                                
+                                // Get referred user info  
+                                let referredName = 'Unknown';  
+                                try {  
+                                    const referredDoc = await db.collection('users').doc(referral.referredId).get();  
+                                    if (referredDoc.exists) {  
+                                        referredName = referredDoc.data().displayName || referredDoc.data().email;  
+                                    }  
+                                } catch (e) {  
+                                    console.warn('Could not fetch referred user:', e);  
+                                }  
+                                
+                                const createdDate = referral.createdAt?.seconds ?   
+                                    new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
+                                
+                                html += `  
+                                    <div class="referral-card pending">  
+                                        <div class="referral-header">  
                                             <div>  
-                                                <strong>Referrer:</strong> ${referrer?.email || 'Unknown'}<br>  
-                                                <small>ID: ${referral.referrerId.substring(0, 8)}...</small>  
+                                                <span class="badge warning">Pending</span>  
+                                                <span class="referral-amount" style="margin-left: 1rem;">  
+                                                    <i class="fas fa-gift"></i> $${REFERRAL_BONUS_REFERRER + REFERRAL_BONUS_REFERRED} total  
+                                                </span>  
                                             </div>  
                                         </div>  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-user-plus"></i>  
-                                            <div>  
-                                                <strong>Referred:</strong> ${referral.referredEmail}<br>  
-                                                <small>ID: ${referral.referredId.substring(0, 8)}...</small>  
+                                        
+                                        <div class="referral-details">  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-user"></i>  
+                                                <div>  
+                                                    <strong>Referrer:</strong> ${referrerEmail}<br>  
+                                                    <small>ID: ${referral.referrerId.substring(0, 8)}...</small>  
+                                                </div>  
+                                            </div>  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-user-plus"></i>  
+                                                <div>  
+                                                    <strong>Referred:</strong> ${referral.referredEmail}<br>  
+                                                    <small>ID: ${referral.referredId.substring(0, 8)}...</small>  
+                                                </div>  
+                                            </div>  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-calendar"></i>  
+                                                <div>  
+                                                    <strong>Referred on:</strong> ${createdDate}  
+                                                </div>  
                                             </div>  
                                         </div>  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-calendar"></i>  
-                                            <div>  
-                                                <strong>Referred on:</strong> ${createdDate}  
+                                        
+                                        <div class="bonus-breakdown">  
+                                            <h5 style="margin-bottom: 0.5rem;">Bonus Breakdown:</h5>  
+                                            <div class="bonus-row referrer">  
+                                                <span>👤 Referrer</span>  
+                                                <span>+$${REFERRAL_BONUS_REFERRER}</span>  
+                                            </div>  
+                                            <div class="bonus-row referred">  
+                                                <span>👥 Referred</span>  
+                                                <span>+$${REFERRAL_BONUS_REFERRED}</span>  
                                             </div>  
                                         </div>  
-                                    </div>  
-                                    
-                                    <div class="bonus-breakdown">  
-                                        <h5 style="margin-bottom: 0.5rem;">Bonus Breakdown:</h5>  
-                                        <div class="bonus-row referrer">  
-                                            <span>👤 Referrer (${referrer?.email})</span>  
-                                            <span>+$${REFERRAL_BONUS_REFERRER}</span>  
+                                        
+                                        <div class="flex-row" style="margin-top: 1rem;">  
+                                            <button class="btn btn-success credit-referral-btn"   
+                                                    data-referral-id="${referral.id}"  
+                                                    data-referrer-id="${referral.referrerId}"  
+                                                    data-referred-id="${referral.referredId}"  
+                                                    data-referred-email="${referral.referredEmail}">  
+                                                <i class="fas fa-check-circle"></i> Credit Bonuses  
+                                            </button>  
+                                            <button class="btn btn-danger reject-referral-btn" data-referral-id="${referral.id}">  
+                                                <i class="fas fa-times-circle"></i> Reject  
+                                            </button>  
                                         </div>  
-                                        <div class="bonus-row referred">  
-                                            <span>👥 Referred (${referral.referredEmail})</span>  
-                                            <span>+$${REFERRAL_BONUS_REFERRED}</span>  
-                                        </div>  
                                     </div>  
-                                    
-                                    <div class="flex-row" style="margin-top: 1rem;">  
-                                        <button class="btn btn-success credit-referral-btn"   
-                                                data-referral-id="${referral.id}"  
-                                                data-referrer-id="${referral.referrerId}"  
-                                                data-referred-id="${referral.referredId}"  
-                                                data-referred-email="${referral.referredEmail}">  
-                                            <i class="fas fa-check-circle"></i> Credit Bonuses  
-                                        </button>  
-                                        <button class="btn btn-danger reject-referral-btn" data-referral-id="${referral.id}">  
-                                            <i class="fas fa-times-circle"></i> Reject  
-                                        </button>  
-                                    </div>  
-                                </div>  
-                            `;  
+                                `;  
+                            } catch (e) {  
+                                console.warn('Error displaying referral:', e);  
+                                // Skip this referral if there's an error  
+                            }  
                         }  
                     }  
                     
@@ -1270,36 +1376,40 @@
                         html += '<h4 style="margin: 2rem 0 1rem 0; color: #10b981;">Completed Referrals ✓</h4>';  
                         
                         for (const referral of completed) {  
-                            const createdDate = referral.createdAt?.seconds ?   
-                                new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
-                            const completedDate = referral.completedAt?.seconds ?   
-                                new Date(referral.completedAt.seconds * 1000).toLocaleDateString() : 'N/A';  
-                            
-                            html += `  
-                                <div class="referral-card completed">  
-                                    <div class="referral-header">  
-                                        <div>  
-                                            <span class="badge success">Completed</span>  
+                            try {  
+                                const createdDate = referral.createdAt?.seconds ?   
+                                    new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
+                                const completedDate = referral.completedAt?.seconds ?   
+                                    new Date(referral.completedAt.seconds * 1000).toLocaleDateString() : 'N/A';  
+                                
+                                html += `  
+                                    <div class="referral-card completed">  
+                                        <div class="referral-header">  
+                                            <div>  
+                                                <span class="badge success">Completed</span>  
+                                            </div>  
+                                            <span class="referral-amount">$${REFERRAL_BONUS_REFERRER + REFERRAL_BONUS_REFERRED} paid</span>  
                                         </div>  
-                                        <span class="referral-amount">$${REFERRAL_BONUS_REFERRER + REFERRAL_BONUS_REFERRED} paid</span>  
+                                        
+                                        <div class="referral-details">  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-user"></i>  
+                                                <span>Referrer: ${referral.referrerId.substring(0, 8)}...</span>  
+                                            </div>  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-user-plus"></i>  
+                                                <span>Referred: ${referral.referredEmail}</span>  
+                                            </div>  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-check-circle"></i>  
+                                                <span>Completed: ${completedDate}</span>  
+                                            </div>  
+                                        </div>  
                                     </div>  
-                                    
-                                    <div class="referral-details">  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-user"></i>  
-                                            <span>Referrer: ${referral.referrerId.substring(0, 8)}...</span>  
-                                        </div>  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-user-plus"></i>  
-                                            <span>Referred: ${referral.referredEmail}</span>  
-                                        </div>  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-check-circle"></i>  
-                                            <span>Completed: ${completedDate}</span>  
-                                        </div>  
-                                    </div>  
-                                </div>  
-                            `;  
+                                `;  
+                            } catch (e) {  
+                                console.warn('Error displaying completed referral:', e);  
+                            }  
                         }  
                     }  
                     
@@ -1308,32 +1418,45 @@
                         html += '<h4 style="margin: 2rem 0 1rem 0; color: #ef4444;">Rejected Referrals ✗</h4>';  
                         
                         for (const referral of rejected) {  
-                            const createdDate = referral.createdAt?.seconds ?   
-                                new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
-                            
-                            html += `  
-                                <div class="referral-card rejected">  
-                                    <div class="referral-header">  
-                                        <span class="badge danger">Rejected</span>  
+                            try {  
+                                const createdDate = referral.createdAt?.seconds ?   
+                                    new Date(referral.createdAt.seconds * 1000).toLocaleDateString() : 'N/A';  
+                                
+                                html += `  
+                                    <div class="referral-card rejected">  
+                                        <div class="referral-header">  
+                                            <span class="badge danger">Rejected</span>  
+                                        </div>  
+                                        
+                                        <div class="referral-details">  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-user"></i>  
+                                                <span>Referrer: ${referral.referrerId.substring(0, 8)}...</span>  
+                                            </div>  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-user-plus"></i>  
+                                                <span>Referred: ${referral.referredEmail}</span>  
+                                            </div>  
+                                            <div class="referral-detail-item">  
+                                                <i class="fas fa-calendar"></i>  
+                                                <span>Referred on: ${createdDate}</span>  
+                                            </div>  
+                                        </div>  
                                     </div>  
-                                    
-                                    <div class="referral-details">  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-user"></i>  
-                                            <span>Referrer: ${referral.referrerId.substring(0, 8)}...</span>  
-                                        </div>  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-user-plus"></i>  
-                                            <span>Referred: ${referral.referredEmail}</span>  
-                                        </div>  
-                                        <div class="referral-detail-item">  
-                                            <i class="fas fa-calendar"></i>  
-                                            <span>Referred on: ${createdDate}</span>  
-                                        </div>  
-                                    </div>  
-                                </div>  
-                            `;  
+                                `;  
+                            } catch (e) {  
+                                console.warn('Error displaying rejected referral:', e);  
+                            }  
                         }  
+                    }  
+                    
+                    // If all sections are empty but there are referrals (shouldn't happen, but just in case)  
+                    if (pending.length === 0 && completed.length === 0 && rejected.length === 0 && !snapshot.empty) {  
+                        html += `  
+                            <div style="text-align: center; padding: 2rem;">  
+                                <p>There are ${snapshot.size} referrals but they couldn't be categorized.</p>  
+                            </div>  
+                        `;  
                     }  
                 }  
                 
@@ -1341,13 +1464,35 @@
                 
             } catch (error) {  
                 console.error('Error loading referrals:', error);  
+                
+                // Handle specific error types
+                let errorMessage = error.message;
+                let errorTitle = 'Error Loading Referrals';
+                let errorIcon = 'fa-exclamation-triangle';
+                let errorColor = '#ef4444';
+                
+                if (error.code === 'permission-denied') {
+                    errorMessage = 'You don\'t have permission to view referrals. Please check your admin privileges.';
+                    errorTitle = 'Permission Denied';
+                    errorIcon = 'fa-shield-alt';
+                    errorColor = '#f59e0b';
+                } else if (error.message.includes('collection')) {
+                    errorMessage = 'The referrals collection hasn\'t been created yet. It will be created automatically when the first referral is made.';
+                    errorTitle = 'No Referrals Yet';
+                    errorIcon = 'fa-users';
+                    errorColor = '#6366f1';
+                }
+                
                 document.getElementById('content').innerHTML = `  
                     <div style="text-align: center; padding: 3rem;">  
-                        <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;"></i>  
-                        <h3>Error Loading Referrals</h3>  
-                        <p style="color: #64748b;">${error.message}</p>  
-                        <button class="btn btn-primary" onclick="loadReferrals()" style="margin-top: 1rem;">  
+                        <i class="fas ${errorIcon}" style="font-size: 4rem; color: ${errorColor}; margin-bottom: 1rem;"></i>  
+                        <h3 style="margin-bottom: 0.5rem;">${errorTitle}</h3>  
+                        <p style="color: #64748b; margin-bottom: 2rem;">${errorMessage}</p>  
+                        <button class="btn btn-primary" onclick="loadReferrals()" style="margin-right: 0.5rem;">  
                             <i class="fas fa-sync-alt"></i> Try Again  
+                        </button>  
+                        <button class="btn btn-success" onclick="createSampleReferral()">  
+                            <i class="fas fa-flask"></i> Create Sample Data  
                         </button>  
                     </div>  
                 `;  
@@ -1942,6 +2087,8 @@
         window.creditReferralBonus = creditReferralBonus;  
         window.executeCreditBonus = executeCreditBonus;  
         window.rejectReferral = rejectReferral;  
+        window.initializeReferralCollections = initializeReferralCollections;  
+        window.createSampleReferral = createSampleReferral;  
         window.sendMessage = sendMessage;  
         window.sendBroadcast = sendBroadcast;  
         window.executeBroadcast = executeBroadcast;  
