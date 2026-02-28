@@ -1,0 +1,18 @@
+# Dashboard routes - serve their respective HTML files
+/user-dashboard    /user-dashboard.html   200
+/admin-dashboard   /admin-dashboard.html  200
+
+# Also handle any direct paths to the HTML files
+/user-dashboard.html    /user-dashboard.html   200
+/admin-dashboard.html   /admin-dashboard.html  200
+
+# Registration/Signup routes - all go to index.html
+/register/*     /index.html   200
+/join/*         /index.html   200
+/signup/*       /index.html   200
+/ref/*          /index.html   200
+/r/*            /index.html   200
+
+# Handle the root with or without referral code
+/               /index.html   200
+/*              /index.html   200
