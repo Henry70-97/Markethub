@@ -954,7 +954,7 @@
             }
         }
         
-        // NEW: Load fee settings from Firestore
+        // Load fee settings from Firestore
         async function loadFeeSettings() {
             try {
                 const doc = await db.collection('settings').doc('feeSettings').get();
@@ -978,7 +978,7 @@
             return feeSettings;
         }
         
-        // NEW: Save fee settings to Firestore
+        // Save fee settings to Firestore
         async function saveFeeSettings(settings) {
             try {
                 await db.collection('settings').doc('feeSettings').set(settings);
@@ -1732,7 +1732,7 @@
             loadWithdrawals();  
         }  
         
-        // NEW FUNCTION: Show Edit Fee Settings Modal
+        // Show Edit Fee Settings Modal
         function showEditFeeSettings() {
             if (!feeSettings) {
                 showAlert('Fee settings not loaded', 'error');
@@ -1825,7 +1825,7 @@
                     </div>
                     
                     <div class="fee-preview">
-                        <h5 style="margin-bottom:0.5rem;">Fee Preview</h5>
+                        <h5 style="margin-bottom:0.5rem;">Fee Preview (based on $100)</h5>
                         <div class="fee-row">
                             <span>Withdrawal: $100</span>
                             <span id="previewAmount">$100.00</span>
@@ -1855,7 +1855,7 @@
                 </div>
             `);
             
-            // Add event listeners
+            // Add event listeners after modal is shown
             setTimeout(() => {
                 document.getElementById('transactionFeePercent').addEventListener('input', updateFeePreview);
                 document.getElementById('platformFeePercent').addEventListener('input', updateFeePreview);
@@ -1864,6 +1864,7 @@
                 document.querySelectorAll('.add-method').forEach(btn => {
                     btn.addEventListener('click', function(e) {
                         e.preventDefault();
+                        e.stopPropagation();
                         const index = parseInt(this.getAttribute('data-index'));
                         addWithdrawalMethod(index);
                     });
@@ -1872,16 +1873,23 @@
                 document.querySelectorAll('.remove-method').forEach(btn => {
                     btn.addEventListener('click', function(e) {
                         e.preventDefault();
+                        e.stopPropagation();
                         const index = parseInt(this.getAttribute('data-index'));
                         removeWithdrawalMethod(index);
                     });
+                });
+                
+                document.getElementById('saveFeeSettingsBtn').addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    await saveFeeSettings();
                 });
                 
                 updateFeePreview();
             }, 100);
         }
         
-        // NEW: Update fee preview
+        // Update fee preview
         function updateFeePreview() {
             const transactionFee = parseFloat(document.getElementById('transactionFeePercent')?.value) || 0;
             const platformFee = parseFloat(document.getElementById('platformFeePercent')?.value) || 0;
@@ -1898,7 +1906,7 @@
             document.getElementById('previewKES').textContent = 'KES ' + (netAmount * exchangeRate).toFixed(2);
         }
         
-        // NEW: Add withdrawal method
+        // Add withdrawal method
         function addWithdrawalMethod(index) {
             const methodsList = document.getElementById('methods-list');
             const newMethod = document.createElement('div');
@@ -1919,9 +1927,24 @@
             }
             
             reindexMethods();
+            
+            // Add event listeners to new buttons
+            newMethod.querySelector('.add-method').addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const idx = parseInt(this.getAttribute('data-index'));
+                addWithdrawalMethod(idx);
+            });
+            
+            newMethod.querySelector('.remove-method').addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const idx = parseInt(this.getAttribute('data-index'));
+                removeWithdrawalMethod(idx);
+            });
         }
         
-        // NEW: Remove withdrawal method
+        // Remove withdrawal method
         function removeWithdrawalMethod(index) {
             const methodsList = document.getElementById('methods-list');
             if (methodsList.children.length <= 1) {
@@ -1933,7 +1956,7 @@
             reindexMethods();
         }
         
-        // NEW: Reindex methods
+        // Reindex methods
         function reindexMethods() {
             const methodsList = document.getElementById('methods-list');
             Array.from(methodsList.children).forEach((child, newIndex) => {
@@ -1943,47 +1966,66 @@
             });
         }
         
-        // NEW: Save Fee Settings
+        // Save Fee Settings
         async function saveFeeSettings() {
-            const transactionFeePercent = parseFloat(document.getElementById('transactionFeePercent').value) || 3;
-            const platformFeePercent = parseFloat(document.getElementById('platformFeePercent').value) || 2;
-            const minimumWithdrawal = parseFloat(document.getElementById('minimumWithdrawal').value) || 5;
-            const maxWithdrawalPerDay = parseFloat(document.getElementById('maxWithdrawalPerDay').value) || 1000;
-            const maxWithdrawalPerMonth = parseFloat(document.getElementById('maxWithdrawalPerMonth').value) || 5000;
-            const exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 130;
-            
-            // Collect methods
-            const methods = [];
-            document.querySelectorAll('.method-input').forEach(input => {
-                const value = input.value.trim();
-                if (value) {
-                    methods.push(value);
+            try {
+                const transactionFeePercent = parseFloat(document.getElementById('transactionFeePercent').value) || 3;
+                const platformFeePercent = parseFloat(document.getElementById('platformFeePercent').value) || 2;
+                const minimumWithdrawal = parseFloat(document.getElementById('minimumWithdrawal').value) || 5;
+                const maxWithdrawalPerDay = parseFloat(document.getElementById('maxWithdrawalPerDay').value) || 1000;
+                const maxWithdrawalPerMonth = parseFloat(document.getElementById('maxWithdrawalPerMonth').value) || 5000;
+                const exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 130;
+                
+                // Collect methods
+                const methods = [];
+                document.querySelectorAll('.method-input').forEach(input => {
+                    const value = input.value.trim();
+                    if (value) {
+                        methods.push(value);
+                    }
+                });
+                
+                if (methods.length === 0) {
+                    showAlert('At least one withdrawal method is required', 'error');
+                    return;
                 }
-            });
-            
-            if (methods.length === 0) {
-                showAlert('At least one withdrawal method is required', 'error');
-                return;
-            }
-            
-            const settings = {
-                transactionFeePercent,
-                platformFeePercent,
-                minimumWithdrawal,
-                maxWithdrawalPerDay,
-                maxWithdrawalPerMonth,
-                exchangeRate,
-                withdrawalMethods: methods
-            };
-            
-            const success = await saveFeeSettings(settings);
-            if (success) {
-                closeModal();
-                loadSettings(); // Refresh the settings tab
+                
+                const settings = {
+                    transactionFeePercent,
+                    platformFeePercent,
+                    minimumWithdrawal,
+                    maxWithdrawalPerDay,
+                    maxWithdrawalPerMonth,
+                    exchangeRate,
+                    withdrawalMethods: methods
+                };
+                
+                const success = await saveFeeSettingsToFirestore(settings);
+                if (success) {
+                    closeModal();
+                    loadSettings(); // Refresh the settings tab
+                }
+            } catch (error) {
+                console.error('Error saving fee settings:', error);
+                showAlert('Error saving settings: ' + error.message, 'error');
             }
         }
         
-        // NEW FUNCTION: Show Edit Membership Packages Modal
+        // Save fee settings to Firestore (renamed to avoid conflict)
+        async function saveFeeSettingsToFirestore(settings) {
+            try {
+                await db.collection('settings').doc('feeSettings').set(settings);
+                feeSettings = settings;
+                showAlert('Fee settings updated successfully!', 'success');
+                return true;
+            } catch (error) {
+                console.error('Error saving fee settings:', error);
+                showAlert('Error saving settings: ' + error.message, 'error');
+                return false;
+            }
+        }
+        
+        // Show Edit Membership Packages Modal
         function showEditPackages() {
             if (!membershipPackages) {
                 showAlert('Membership packages not loaded', 'error');
@@ -2089,6 +2131,11 @@
                         removeFeature(type, index);
                     });
                 });
+                
+                document.getElementById('savePackagesBtn').addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    await savePackages();
+                });
             }, 100);
         }
         
@@ -2128,6 +2175,21 @@
             
             // Reindex all features
             reindexFeatures(type);
+            
+            // Add event listeners to new buttons
+            newFeature.querySelector('.add-feature').addEventListener('click', function(e) {
+                e.preventDefault();
+                const t = this.getAttribute('data-type');
+                const idx = parseInt(this.getAttribute('data-index'));
+                addFeature(t, idx);
+            });
+            
+            newFeature.querySelector('.remove-feature').addEventListener('click', function(e) {
+                e.preventDefault();
+                const t = this.getAttribute('data-type');
+                const idx = parseInt(this.getAttribute('data-index'));
+                removeFeature(t, idx);
+            });
         }
         
         // Helper function to remove a feature
@@ -2152,51 +2214,56 @@
             });
         }
         
-        // NEW FUNCTION: Save Membership Packages
+        // Save Membership Packages
         async function savePackages() {
-            const updatedPackages = {};
-            
-            for (const type of Object.keys(membershipPackages)) {
-                const pkg = {
-                    name: document.querySelector(`.package-name-input[data-type="${type}"]`).value,
-                    price: parseFloat(document.querySelector(`.package-price-input[data-type="${type}"]`).value) || 0,
-                    duration: document.querySelector(`.package-duration-input[data-type="${type}"]`).value,
-                    features: [],
-                    color: membershipPackages[type].color, // Keep original color
-                    buttonClass: membershipPackages[type].buttonClass, // Keep original button class
-                    badge: document.querySelector(`.package-badge-input[data-type="${type}"]`).value || null
-                };
+            try {
+                const updatedPackages = {};
                 
-                if (type === 'elite') {
-                    pkg.welcomeBonus = parseFloat(document.querySelector(`.welcome-bonus-input[data-type="${type}"]`).value) || 10;
+                for (const type of Object.keys(membershipPackages)) {
+                    const pkg = {
+                        name: document.querySelector(`.package-name-input[data-type="${type}"]`).value,
+                        price: parseFloat(document.querySelector(`.package-price-input[data-type="${type}"]`).value) || 0,
+                        duration: document.querySelector(`.package-duration-input[data-type="${type}"]`).value,
+                        features: [],
+                        color: membershipPackages[type].color,
+                        buttonClass: membershipPackages[type].buttonClass,
+                        badge: document.querySelector(`.package-badge-input[data-type="${type}"]`).value || null
+                    };
+                    
+                    if (type === 'elite') {
+                        pkg.welcomeBonus = parseFloat(document.querySelector(`.welcome-bonus-input[data-type="${type}"]`).value) || 10;
+                    }
+                    
+                    // Collect features
+                    const featureItems = document.querySelectorAll(`#features-${type} .feature-item`);
+                    featureItems.forEach(item => {
+                        const included = item.querySelector('.feature-included').checked;
+                        const text = item.querySelector('.feature-text').value;
+                        const icon = item.querySelector('.feature-icon').value;
+                        const highlight = item.querySelector('.feature-highlight')?.checked || false;
+                        
+                        if (text.trim()) {
+                            const feature = { text: text.trim(), included, icon };
+                            if (highlight) feature.highlight = true;
+                            pkg.features.push(feature);
+                        }
+                    });
+                    
+                    updatedPackages[type] = pkg;
                 }
                 
-                // Collect features
-                const featureItems = document.querySelectorAll(`#features-${type} .feature-item`);
-                featureItems.forEach(item => {
-                    const included = item.querySelector('.feature-included').checked;
-                    const text = item.querySelector('.feature-text').value;
-                    const icon = item.querySelector('.feature-icon').value;
-                    const highlight = item.querySelector('.feature-highlight')?.checked || false;
-                    
-                    if (text.trim()) {
-                        const feature = { text: text.trim(), included, icon };
-                        if (highlight) feature.highlight = true;
-                        pkg.features.push(feature);
-                    }
-                });
-                
-                updatedPackages[type] = pkg;
-            }
-            
-            const success = await saveMembershipPackages(updatedPackages);
-            if (success) {
-                closeModal();
-                loadMemberships(); // Refresh the memberships tab
+                const success = await saveMembershipPackages(updatedPackages);
+                if (success) {
+                    closeModal();
+                    loadMemberships();
+                }
+            } catch (error) {
+                console.error('Error saving packages:', error);
+                showAlert('Error saving packages: ' + error.message, 'error');
             }
         }
         
-        // UPDATED: Load Memberships with package management
+        // Load Memberships with package management
         async function loadMemberships() {  
             // Get pending payments
             const snapshot = await db.collection('membershipPayments')  
@@ -2289,7 +2356,7 @@
             document.getElementById('content').innerHTML = html;  
         }  
         
-        // UPDATED: Approve Membership with dynamic package benefits
+        // Approve Membership with dynamic package benefits
         async function approveMembership(userId, paymentId) {
             try {
                 // Get payment details to know which membership was purchased
@@ -2442,7 +2509,7 @@
             }
         }  
 
-        // NEW: Load Settings Tab
+        // Load Settings Tab
         async function loadSettings() {
             if (!feeSettings) {
                 await loadFeeSettings();
@@ -3592,25 +3659,28 @@
             }  
             
             // Edit Packages button
-            if (target.classList.contains('edit-packages-btn') || (target.id === 'editPackagesBtn')) {
+            if (target.classList.contains('edit-packages-btn') || target.id === 'editPackagesBtn' || 
+                (target.closest('button') && target.closest('button').textContent.includes('Edit Packages'))) {
                 showEditPackages();
                 return;
             }
             
             // Save Packages button
-            if (target.id === 'savePackagesBtn') {
+            if (target.id === 'savePackagesBtn' || (target.closest('button') && target.closest('button').id === 'savePackagesBtn')) {
+                e.preventDefault();
                 await savePackages();
                 return;
             }
             
             // Edit Fee Settings button
-            if (target.onclick && target.onclick.toString().includes('showEditFeeSettings')) {
-                // Handled by onclick
+            if (target.id === 'editFeeSettingsBtn' || (target.closest('button') && target.closest('button').textContent.includes('Edit Fee Settings'))) {
+                showEditFeeSettings();
                 return;
             }
             
             // Save Fee Settings button
-            if (target.id === 'saveFeeSettingsBtn') {
+            if (target.id === 'saveFeeSettingsBtn' || (target.closest('button') && target.closest('button').id === 'saveFeeSettingsBtn')) {
+                e.preventDefault();
                 await saveFeeSettings();
                 return;
             }
