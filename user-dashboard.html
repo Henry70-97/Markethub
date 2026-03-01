@@ -2658,15 +2658,13 @@
                         </div>
                     `;
                 } else {
-                    // For non-premium users, show a message and a button that triggers the processing bar + upgrade prompt
+                    // For non-premium users, show a simple button to attempt withdrawal
                     withdrawalSection = `
                         <div class="withdrawal-section" id="withdrawalSection">
                             <div class="withdrawal-content" style="text-align: center;">
-                                <i class="fas fa-lock" style="font-size: 3rem; color: #6366f1; margin-bottom: 1rem;"></i>
-                                <h4 style="margin-bottom: 1rem;">Withdrawal Locked</h4>
+                                <h4 style="margin-bottom: 1rem;">Start Withdrawal</h4>
                                 <p style="margin-bottom: 1.5rem; color: #64748b;">
-                                    Withdrawals are only available to premium members.<br>
-                                    Click the button below to attempt a withdrawal and upgrade.
+                                    Click the button below to initiate a withdrawal request.
                                 </p>
                                 <button class="btn btn-primary" onclick="simulateWithdrawalAttempt()" style="padding: 1rem 2rem;">
                                     <i class="fas fa-arrow-right"></i> Attempt Withdrawal
@@ -2795,6 +2793,81 @@
                     </div>
                 </div>
             `);
+        }
+        
+        // Show membership payment modal
+        function showMembershipPayment(membershipType) {
+            const pkg = getPackageByType(membershipType);
+            const price = pkg.price;
+            const duration = pkg.duration;
+            const name = pkg.name;
+            
+            let bonusText = '';
+            if (membershipType === MEMBERSHIP_TYPES.ELITE && pkg.welcomeBonus) {
+                bonusText = `<p style="color:#10b981; margin-top:0.5rem;">
+                    <i class="fas fa-gift"></i> You'll receive a $${pkg.welcomeBonus} welcome bonus!
+                </p>`;
+            }
+            
+            showModal(`
+                <div class="modal-content">
+                    <div style="text-align: center; margin-bottom: 1.5rem;">
+                        <i class="fas ${membershipType === MEMBERSHIP_TYPES.PREMIUM ? 'fa-crown' : 'fa-gem'}" 
+                           style="font-size: 3rem; color: ${membershipType === MEMBERSHIP_TYPES.PREMIUM ? '#6366f1' : '#f59e0b'}; margin-bottom: 1rem;"></i>
+                        <h3 style="margin-bottom:0.5rem;">Upgrade to ${name}</h3>
+                        <p style="color:#64748b;">$${price} ${duration === 'annual' ? 'per year' : 'lifetime'}</p>
+                    </div>
+                    
+                    <div style="background: #f3f4f6; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                        <p><strong>Pay via LIPANA GATEWAYS:</strong></p>
+                        <p>1. Visit <a href="https://lipana.dev/pay/nextgen-membership" target="_blank">lipwa.com</a></p>
+                        <p>2. Send $${price} to username: <strong>@nextgen</strong></p>
+                        <p>3. Copy the transaction ID</p>
+                        ${bonusText}
+                    </div>
+                    
+                    <input type="text" id="transactionCode" placeholder="Enter Transaction ID">
+                    
+                    <div style="display:flex; gap:1rem; margin-top:1.5rem;">
+                        <button class="btn btn-success" style="flex:2;" onclick="submitMembershipPayment('${membershipType}')">
+                            <i class="fas fa-check"></i> Verify Payment
+                        </button>
+                        <button class="btn btn-secondary" style="flex:1;" onclick="closeModal()">Cancel</button>
+                    </div>
+                </div>
+            `);
+        }
+        
+        // Submit membership payment
+        async function submitMembershipPayment(membershipType) {
+            const code = document.getElementById('transactionCode')?.value;
+            if (!code) {
+                showAlert('Enter transaction ID', 'error');
+                return;
+            }
+            
+            const pkg = getPackageByType(membershipType);
+            
+            try {
+                await db.collection('membershipPayments').add({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    membershipType: membershipType,
+                    membershipName: pkg.name,
+                    transactionCode: code,
+                    amount: pkg.price,
+                    duration: pkg.duration,
+                    status: 'pending',
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showAlert('Payment proof submitted for review! You will be upgraded once verified.', 'success');
+                closeModal();
+                
+            } catch (error) {
+                console.error('Error submitting payment:', error);
+                showAlert('Error submitting payment', 'error');
+            }
         }
         
         // Update fee breakdown - now uses dynamic fee percentages
