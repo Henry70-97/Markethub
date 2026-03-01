@@ -453,6 +453,38 @@
             box-shadow: none;
         }
         
+        /* WhatsApp Group Button */
+        .whatsapp-group-btn {
+            background: #25D366;
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 40px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            font-size: 0.95rem;
+        }
+        
+        .whatsapp-group-btn:hover {
+            background: #128C7E;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
+        }
+        
+        .whatsapp-group-btn i {
+            font-size: 1.2rem;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
         /* Membership Packages */
         .packages-grid {
             display: grid;
@@ -1714,9 +1746,10 @@
             <i class="fas fa-money-bill-wave"></i>
             <span>Withdrawals</span>
         </div>
-        <div class="mobile-nav-item" onclick="handleMobileNavClick('referrals')">
+        <div class="mobile-nav-item" onclick="handleMobileNavClick('recommendations')">
             <i class="fas fa-users"></i>
-            <span>Referrals</span>
+            <span>Recommendations</span>
+            <span id="mobileUnreadBadge" style="display:none; background:#ef4444; color:white; border-radius:40px; padding:0.2rem 0.5rem; font-size:0.8rem; margin-left:auto;">0</span>
         </div>
         <div class="mobile-nav-item" onclick="handleMobileNavClick('messages')">
             <i class="fas fa-envelope"></i>
@@ -1726,6 +1759,11 @@
         <div class="mobile-nav-item" onclick="handleMobileNavClick('profile')">
             <i class="fas fa-user"></i>
             <span>Profile</span>
+        </div>
+        <!-- WhatsApp Group Link in Mobile Menu -->
+        <div class="mobile-nav-item" onclick="window.open('https://chat.whatsapp.com/F9ql5QAItJr8iCdpeEdHEu?mode=gi_t', '_blank')" style="color: #25D366;">
+            <i class="fab fa-whatsapp"></i>
+            <span>Join WhatsApp Group</span>
         </div>
         <div style="margin-top: 2rem; padding-top: 1rem; border-top: 2px solid #f1f5f9;">
             <div class="mobile-nav-item" onclick="logout()" style="color: #ef4444;">
@@ -1743,10 +1781,17 @@
             <div class="logo">
                 <h2>🔷 NextGen Tasks</h2>
             </div>
-            <div class="user-menu">
-                <div class="wallet-badge" id="walletDisplay">$0.00</div>
-                <span id="userName">Loading...</span>
-                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+            <div class="header-actions">
+                <!-- WhatsApp Group Button in Desktop Header -->
+                <button class="whatsapp-group-btn" onclick="window.open('https://chat.whatsapp.com/F9ql5QAItJr8iCdpeEdHEu?mode=gi_t', '_blank')">
+                    <i class="fab fa-whatsapp"></i>
+                    <span class="desktop-only">Join WhatsApp Group</span>
+                </button>
+                <div class="user-menu">
+                    <div class="wallet-badge" id="walletDisplay">$0.00</div>
+                    <span id="userName">Loading...</span>
+                    <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
             </div>
         </div>
         
@@ -1757,7 +1802,7 @@
             <button class="tab active" onclick="switchTab('tasks')">📋 Available Tasks</button>
             <button class="tab" onclick="switchTab('submissions')">📝 My Submissions</button>
             <button class="tab" onclick="switchTab('withdrawals')">💰 Withdrawals</button>
-            <button class="tab" onclick="switchTab('referrals')">👥 Referrals</button>
+            <button class="tab" onclick="switchTab('recommendations')">👥 Recommendations</button>
             <button class="tab" onclick="switchTab('messages')">
                 💬 Messages 
                 <span id="unreadMessagesBadge" style="display:none; background:#ef4444; color:white; border-radius:40px; padding:0.2rem 0.5rem; font-size:0.7rem; margin-left:0.3rem;">0</span>
@@ -1788,6 +1833,38 @@
         <button onclick="hideAlert()">OK</button>
     </div>
     
+    <style>
+        /* Additional styles for WhatsApp button */
+        .desktop-only {
+            display: inline;
+        }
+        
+        @media (max-width: 768px) {
+            .desktop-only {
+                display: none;
+            }
+            
+            .whatsapp-group-btn {
+                padding: 0.5rem;
+            }
+            
+            .whatsapp-group-btn i {
+                font-size: 1.5rem;
+                margin: 0;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .whatsapp-group-btn {
+                padding: 0.5rem;
+            }
+            
+            .whatsapp-group-btn span {
+                display: none;
+            }
+        }
+    </style>
+    
     <script>
         // Firebase Config
         const firebaseConfig = {
@@ -1804,10 +1881,64 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         
-        // Fee constants
-        const TRANSACTION_FEE_PERCENT = 3;
-        const PLATFORM_FEE_PERCENT = 2;
-        const TOTAL_FEE_PERCENT = TRANSACTION_FEE_PERCENT + PLATFORM_FEE_PERCENT;
+        // Fee constants - will be loaded from Firestore
+        let TRANSACTION_FEE_PERCENT = 3; // Default fallback
+        let PLATFORM_FEE_PERCENT = 2;    // Default fallback
+        let TOTAL_FEE_PERCENT = TRANSACTION_FEE_PERCENT + PLATFORM_FEE_PERCENT;
+        
+        // Function to load fee settings from Firestore
+        async function loadFeeSettings() {
+            try {
+                const doc = await db.collection('settings').doc('fees').get();
+                
+                if (doc.exists) {
+                    const feeData = doc.data();
+                    TRANSACTION_FEE_PERCENT = feeData.transactionFee || 3;
+                    PLATFORM_FEE_PERCENT = feeData.platformFee || 2;
+                    TOTAL_FEE_PERCENT = TRANSACTION_FEE_PERCENT + PLATFORM_FEE_PERCENT;
+                    
+                    console.log('Loaded fee settings from Firestore:', {
+                        transactionFee: TRANSACTION_FEE_PERCENT,
+                        platformFee: PLATFORM_FEE_PERCENT
+                    });
+                } else {
+                    // Initialize default fees if not exists
+                    await db.collection('settings').doc('fees').set({
+                        transactionFee: 3,
+                        platformFee: 2,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log('Created default fee settings in Firestore');
+                }
+            } catch (error) {
+                console.error('Error loading fee settings:', error);
+                // Keep default values
+            }
+            
+            // Set up real-time listener for fee changes
+            db.collection('settings').doc('fees')
+                .onSnapshot((doc) => {
+                    if (doc.exists) {
+                        const feeData = doc.data();
+                        TRANSACTION_FEE_PERCENT = feeData.transactionFee || 3;
+                        PLATFORM_FEE_PERCENT = feeData.platformFee || 2;
+                        TOTAL_FEE_PERCENT = TRANSACTION_FEE_PERCENT + PLATFORM_FEE_PERCENT;
+                        
+                        console.log('Fee settings updated:', {
+                            transactionFee: TRANSACTION_FEE_PERCENT,
+                            platformFee: PLATFORM_FEE_PERCENT
+                        });
+                        
+                        // If withdrawal tab is currently open, refresh it
+                        const activeTab = document.querySelector('.tab.active');
+                        if (activeTab && activeTab.textContent.includes('Withdrawals')) {
+                            loadWithdrawals();
+                        }
+                    }
+                }, (error) => {
+                    console.error('Fee listener error:', error);
+                });
+        }
         
         // Membership constants
         const MEMBERSHIP_TYPES = {
@@ -2031,7 +2162,7 @@
             }
         }
         
-        // Tab switching function
+        // Tab switching function - updated to handle 'recommendations'
         function switchTab(tab) {
             const desktopTabs = document.querySelectorAll('.tab');
             desktopTabs.forEach(t => t.classList.remove('active'));
@@ -2042,7 +2173,7 @@
                    (tab === 'tasks' && tabText.includes('available')) ||
                    (tab === 'submissions' && tabText.includes('submissions')) ||
                    (tab === 'withdrawals' && tabText.includes('withdrawals')) ||
-                   (tab === 'referrals' && tabText.includes('referrals')) ||
+                   (tab === 'recommendations' && tabText.includes('recommendations')) ||
                    (tab === 'messages' && tabText.includes('messages')) ||
                    (tab === 'profile' && tabText.includes('profile'))) {
                     desktopTabs[i].classList.add('active');
@@ -2058,7 +2189,7 @@
                    (tab === 'tasks' && itemText.includes('available')) ||
                    (tab === 'submissions' && itemText.includes('submissions')) ||
                    (tab === 'withdrawals' && itemText.includes('withdrawals')) ||
-                   (tab === 'referrals' && itemText.includes('referrals')) ||
+                   (tab === 'recommendations' && itemText.includes('recommendations')) ||
                    (tab === 'messages' && itemText.includes('messages')) ||
                    (tab === 'profile' && itemText.includes('profile'))) {
                     item.classList.add('active');
@@ -2075,8 +2206,8 @@
                 case 'withdrawals':
                     loadWithdrawals();
                     break;
-                case 'referrals':
-                    loadReferrals();
+                case 'recommendations':
+                    loadReferrals(); // This function remains the same, just renamed in UI
                     break;
                 case 'messages':
                     loadMessages();
@@ -2228,6 +2359,8 @@
                 document.getElementById('userName').textContent = userData.displayName;
                 document.getElementById('walletDisplay').textContent = `$${(userData.wallet || 0).toFixed(2)}`;
                 
+                // Load fee settings first
+                await loadFeeSettings();
                 setupMessageCounter();
                 await loadMembershipPackages(); // Load membership packages
                 loadDashboard();
@@ -2335,7 +2468,7 @@
                     <div class="stat-card">
                         <i class="fas fa-users"></i>
                         <div class="stat-value">${userData.totalReferrals || 0}</div>
-                        <div class="stat-label">Referrals</div>
+                        <div class="stat-label">Recommendations</div>
                     </div>
                 `;
                 
@@ -3492,7 +3625,7 @@
             }
         }
         
-        // Update fee breakdown
+        // Update fee breakdown - now uses dynamic fee percentages
         function updateFeeBreakdown(maxBalance) {
             const amountInput = document.getElementById('withdrawAmount');
             if (!amountInput) return;
@@ -3536,7 +3669,7 @@
             }
         }
         
-        // Request Withdrawal
+        // Request Withdrawal - now uses dynamic fee percentages
         async function requestWithdrawal() {
             const amount = parseFloat(document.getElementById('withdrawAmount').value);
             const method = document.getElementById('withdrawMethod').value;
@@ -3643,10 +3776,10 @@
             }
         }
         
-        // Load Referrals - UPDATED with clean referral link
+        // Load Referrals - renamed to Recommendations in UI but function stays the same
         async function loadReferrals() {
             try {
-                document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading referrals...</p></div>';
+                document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading recommendations...</p></div>';
                 
                 // Get referral stats
                 const userDoc = await db.collection('users').doc(currentUser.uid).get();
@@ -3691,22 +3824,22 @@
                 userData.totalReferrals = totalReferrals;
                 userData.referralEarnings = totalEarned;
                 
-                // Build referral stats with clean link
+                // Build referral stats with clean link - Updated to use "Recommendations"
                 let statsHtml = `
                     <div class="referral-section">
                         <div class="referral-header">
                             <i class="fas fa-users"></i>
-                            <h3>Referral Program</h3>
+                            <h3>Recommendations Program</h3>
                         </div>
                         
                         <div class="referral-stats">
                             <div class="referral-stat-card">
                                 <div class="referral-stat-value">${totalReferrals}</div>
-                                <div class="referral-stat-label">Total Referrals</div>
+                                <div class="referral-stat-label">Total Recommendations</div>
                             </div>
                             <div class="referral-stat-card">
                                 <div class="referral-stat-value">$${totalEarned.toFixed(2)}</div>
-                                <div class="referral-stat-label">Earned from Referrals</div>
+                                <div class="referral-stat-label">Earned from Recommendations</div>
                             </div>
                             <div class="referral-stat-card">
                                 <div class="referral-stat-value">$${REFERRAL_BONUS_REFERRER}</div>
@@ -3715,7 +3848,7 @@
                         </div>
                         
                         <div style="margin: 2rem 0;">
-                            <h4 style="margin-bottom: 1rem;">Your Referral Link (Clean URL)</h4>
+                            <h4 style="margin-bottom: 1rem;">Your Recommendation Link (Clean URL)</h4>
                             <div class="referral-link-box">
                                 <input type="text" id="referralLink" value="${referralLink}" readonly>
                                 <button onclick="copyReferralLink()"><i class="fas fa-copy"></i> Copy Link</button>
@@ -3748,26 +3881,26 @@
                             <div class="referral-info">
                                 <div class="referral-info-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>You get <strong>$${REFERRAL_BONUS_REFERRER}</strong> when referred user upgrades to Premium</span>
+                                    <span>You get <strong>$${REFERRAL_BONUS_REFERRER}</strong> when recommended user upgrades to Premium</span>
                                 </div>
                                 <div class="referral-info-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Referred user gets <strong>$${REFERRAL_BONUS_REFERRED}</strong> when they upgrade to Premium</span>
+                                    <span>Recommended user gets <strong>$${REFERRAL_BONUS_REFERRED}</strong> when they upgrade to Premium</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 `;
                 
-                // Build referred users table
-                let referralsHtml = '<h4 style="margin-bottom: 1rem;">Your Referrals</h4>';
+                // Build referred users table - Updated to use "Recommendations"
+                let referralsHtml = '<h4 style="margin-bottom: 1rem;">Your Recommendations</h4>';
                 
                 if (referredSnapshot.empty) {
                     referralsHtml += `
                         <div class="empty-state">
                             <i class="fas fa-user-plus"></i>
-                            <p>You haven't referred anyone yet.</p>
-                            <p style="font-size:0.9rem;">Share your referral link to earn bonuses!</p>
+                            <p>You haven't recommended anyone yet.</p>
+                            <p style="font-size:0.9rem;">Share your recommendation link to earn bonuses!</p>
                         </div>
                     `;
                 } else {
@@ -3844,7 +3977,7 @@
                                     <span><i class="fas fa-gift" style="color:#10b981;"></i> <strong>$${bonus.amount.toFixed(2)}</strong></span>
                                     <span class="commission-badge">${bonus.type === 'referrer' ? 'Referrer' : 'Referred'}</span>
                                 </div>
-                                <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.3rem;">From: ${bonus.referredEmail || 'Referral'}</p>
+                                <p style="color:#64748b; font-size:0.85rem; margin-bottom:0.3rem;">From: ${bonus.referredEmail || 'Recommendation'}</p>
                                 <p style="color:#94a3b8; font-size:0.75rem;">${date}</p>
                             </div>
                         `;
@@ -3866,12 +3999,12 @@
                 }
                 
             } catch (error) {
-                console.error('Error loading referrals:', error);
+                console.error('Error loading recommendations:', error);
                 
                 document.getElementById('content').innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i>
-                        <h4>Error Loading Referrals</h4>
+                        <h4>Error Loading Recommendations</h4>
                         <p>${error.message}</p>
                         <button class="btn btn-primary" onclick="loadReferrals()" style="margin-top:1rem;">
                             <i class="fas fa-sync-alt"></i> Try Again
@@ -4294,8 +4427,8 @@
                             ${userData.membershipExpiry.toDate().toLocaleDateString()}
                         </p>
                     ` : ''}
-                    <p style="font-size:1rem; margin-bottom:0.5rem;"><strong>Total Referrals:</strong> ${userData.totalReferrals || 0}</p>
-                    <p style="font-size:1rem; margin-bottom:0.5rem;"><strong>Referral Earnings:</strong> $${(userData.referralEarnings || 0).toFixed(2)}</p>
+                    <p style="font-size:1rem; margin-bottom:0.5rem;"><strong>Total Recommendations:</strong> ${userData.totalReferrals || 0}</p>
+                    <p style="font-size:1rem; margin-bottom:0.5rem;"><strong>Recommendation Earnings:</strong> $${(userData.referralEarnings || 0).toFixed(2)}</p>
                     <p style="font-size:1rem; margin-bottom:0.5rem;"><strong>Total Fees Paid:</strong> $${(userData.totalFeesPaid || 0).toFixed(2)}</p>
                 </div>
                 <div style="margin-top: 1rem; text-align: center; font-size: 0.8rem; color: #94a3b8;">
