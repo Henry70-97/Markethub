@@ -1769,7 +1769,7 @@
                 price: 0,
                 duration: 'lifetime',
                 features: [
-                    { text: 'Access to all tasks', included: true, icon: 'fa-check-circle' },
+                    { text: 'Access to tasks below $3', included: true, icon: 'fa-check-circle' },
                     { text: 'Withdrawals', included: false, icon: 'fa-times-circle' },
                     { text: 'Welcome bonus', included: false, icon: 'fa-times-circle' },
                     { text: 'Standard support', included: true, icon: 'fa-check-circle' },
@@ -1784,7 +1784,7 @@
                 price: 3,
                 duration: 'annual',
                 features: [
-                    { text: 'Access to all tasks', included: true, icon: 'fa-check-circle' },
+                    { text: 'Access to tasks below $3', included: true, icon: 'fa-check-circle' },
                     { text: 'Withdrawals enabled', included: true, icon: 'fa-check-circle', highlight: true },
                     { text: 'Priority support', included: true, icon: 'fa-star' },
                     { text: 'Higher earning potential', included: true, icon: 'fa-chart-line' },
@@ -1799,7 +1799,7 @@
                 price: 6,
                 duration: 'lifetime',
                 features: [
-                    { text: 'Access to all tasks', included: true, icon: 'fa-check-circle' },
+                    { text: 'Access to ALL tasks (including $3+)', included: true, icon: 'fa-check-circle', highlight: true },
                     { text: 'Withdrawals enabled', included: true, icon: 'fa-check-circle', highlight: true },
                     { text: 'Welcome bonus', included: true, icon: 'fa-gift', highlight: true, bonus: true },
                     { text: 'VIP support 24/7', included: true, icon: 'fa-star' },
@@ -1815,16 +1815,6 @@
         
         // Global variable to store membership packages
         let membershipPackages = null;
-        
-        // Helper to get membership level order
-        function getMembershipLevel(type) {
-            switch(type) {
-                case MEMBERSHIP_TYPES.BASIC: return 1;
-                case MEMBERSHIP_TYPES.PREMIUM: return 2;
-                case MEMBERSHIP_TYPES.ELITE: return 3;
-                default: return 0;
-            }
-        }
         
         // Function to load membership packages from Firestore
         async function loadMembershipPackages() {
@@ -2311,7 +2301,7 @@
             }
         }
         
-        // Load Tasks
+        // Load Tasks with membership-based filtering
         async function loadTasks() {
             try {
                 document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading tasks...</p></div>';
@@ -2346,97 +2336,171 @@
                             </div>
                         `;
                     } else {
+                        // Sort tasks by creation date
                         activeTasks.sort((a, b) => {
                             if (!a.createdAt) return 1;
                             if (!b.createdAt) return -1;
                             return (b.createdAt.seconds || 0) - (a.createdAt.seconds || 0);
                         });
                         
-                        html += '<div class="task-grid">';
+                        // Get user's membership type
+                        const userMembership = userData.membershipType || MEMBERSHIP_TYPES.BASIC;
                         
-                        for (const task of activeTasks) {
-                            const hasSubmitted = await hasUserSubmitted(task.id);
-                            const deadlinePassed = isDeadlinePassed(task.deadline);
+                        // Filter tasks based on membership
+                        let filteredTasks = activeTasks;
+                        
+                        // If user is BASIC or PREMIUM, only show tasks below $3
+                        if (userMembership === MEMBERSHIP_TYPES.BASIC || userMembership === MEMBERSHIP_TYPES.PREMIUM) {
+                            filteredTasks = activeTasks.filter(task => {
+                                const reward = parseFloat(task.reward) || 0;
+                                return reward < 3; // Tasks below $3
+                            });
+                        }
+                        // ELITE users see all tasks (no filtering)
+                        
+                        if (filteredTasks.length === 0) {
+                            if (userMembership === MEMBERSHIP_TYPES.BASIC || userMembership === MEMBERSHIP_TYPES.PREMIUM) {
+                                html += `
+                                    <div class="empty-state">
+                                        <i class="fas fa-tasks"></i>
+                                        <h4>No Available Tasks</h4>
+                                        <p>There are currently no tasks below $3 available.</p>
+                                        <p style="font-size:0.95rem; color:#6366f1; margin-top:0.5rem;">
+                                            <i class="fas fa-crown"></i> 
+                                            Upgrade to Elite to access high-paying tasks ($$3+)
+                                        </p>
+                                    </div>
+                                `;
+                            } else {
+                                html += `
+                                    <div class="empty-state">
+                                        <i class="fas fa-tasks"></i>
+                                        <h4>No Tasks Available</h4>
+                                        <p>Check back later for new tasks.</p>
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            html += '<div class="task-grid">';
                             
-                            let rewardValue = 0;
-                            if (task.reward) {
-                                rewardValue = parseFloat(task.reward);
-                                if (isNaN(rewardValue)) rewardValue = 0;
+                            // Show membership info banner for non-Elite users
+                            if (userMembership !== MEMBERSHIP_TYPES.ELITE) {
+                                html += `
+                                    <div style="grid-column: 1 / -1; margin-bottom: 1rem;">
+                                        <div style="background: #f0f9ff; border: 2px solid #6366f1; border-radius: 1rem; padding: 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                                            <i class="fas fa-crown" style="color: #f59e0b; font-size: 1.5rem;"></i>
+                                            <div style="flex: 1;">
+                                                <p style="font-weight: 600; color: #0f172a; margin-bottom: 0.2rem;">
+                                                    Showing tasks below $3
+                                                </p>
+                                                <p style="color: #64748b; font-size: 0.9rem;">
+                                                    Upgrade to Elite to access all tasks including high-paying ones ($$3+)
+                                                </p>
+                                            </div>
+                                            <button class="btn btn-primary" onclick="switchTab('withdrawals')" style="padding: 0.5rem 1.5rem;">
+                                                <i class="fas fa-arrow-up"></i> Upgrade
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
                             }
                             
-                            const title = task.title || 'Untitled Task';
-                            const description = task.description || 'No description provided';
-                            const category = task.category || 'other';
-                            const difficulty = task.difficulty || 'medium';
-                            const clientName = task.clientName || 'NextGen Admin';
-                            
-                            const deadlineText = formatDeadline(task.deadline);
-                            const deadlineClass = getDeadlineClass(task.deadline);
-                            
-                            // Check if user can accept this task based on membership
-                            const canAccept = (userData.membershipType === MEMBERSHIP_TYPES.ELITE) || rewardValue < 3;
-                            
-                            html += `
-                                <div class="task-card">
-                                    <h4 class="task-title">${title}</h4>
-                                    
-                                    <div class="client-info">
-                                        <i class="fas fa-user-circle"></i>
-                                        <span>Client: <strong>${clientName}</strong></span>
-                                    </div>
-                                    
-                                    ${task.deadline ? `
-                                        <div class="deadline-badge ${deadlineClass}">
-                                            <i class="fas ${deadlineClass === 'expired' ? 'fa-calendar-times' : deadlineClass === 'urgent' ? 'fa-exclamation-circle' : 'fa-calendar-alt'}"></i>
-                                            <span>Deadline: ${deadlineText}</span>
+                            for (const task of filteredTasks) {
+                                const hasSubmitted = await hasUserSubmitted(task.id);
+                                const deadlinePassed = isDeadlinePassed(task.deadline);
+                                
+                                let rewardValue = 0;
+                                if (task.reward) {
+                                    rewardValue = parseFloat(task.reward);
+                                    if (isNaN(rewardValue)) rewardValue = 0;
+                                }
+                                
+                                const title = task.title || 'Untitled Task';
+                                const description = task.description || 'No description provided';
+                                const category = task.category || 'other';
+                                const difficulty = task.difficulty || 'medium';
+                                const clientName = task.clientName || 'NextGen Admin';
+                                
+                                const deadlineText = formatDeadline(task.deadline);
+                                const deadlineClass = getDeadlineClass(task.deadline);
+                                
+                                // Add a badge for high-paying tasks
+                                const isHighValue = rewardValue >= 3;
+                                
+                                html += `
+                                    <div class="task-card">
+                                        <h4 class="task-title">${title}</h4>
+                                        
+                                        <div class="client-info">
+                                            <i class="fas fa-user-circle"></i>
+                                            <span>Client: <strong>${clientName}</strong></span>
                                         </div>
-                                    ` : ''}
-                                    
-                                    <p style="color:#64748b; margin-bottom:1rem;">${description.substring(0, 80)}${description.length > 80 ? '...' : ''}</p>
-                                    
-                                    <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-                                        <span class="badge primary">${category}</span>
-                                        <span class="badge warning">${difficulty}</span>
-                                    </div>
-                                    
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                                        <span class="task-amount">$${rewardValue.toFixed(2)}</span>
-                                    </div>
-                                    
-                                    ${deadlinePassed && !hasSubmitted ? `
-                                        <div class="expired-message">
-                                            <i class="fas fa-clock"></i> Submission deadline has passed
+                                        
+                                        ${task.deadline ? `
+                                            <div class="deadline-badge ${deadlineClass}">
+                                                <i class="fas ${deadlineClass === 'expired' ? 'fa-calendar-times' : deadlineClass === 'urgent' ? 'fa-exclamation-circle' : 'fa-calendar-alt'}"></i>
+                                                <span>Deadline: ${deadlineText}</span>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${isHighValue && userMembership === MEMBERSHIP_TYPES.ELITE ? `
+                                            <div class="deadline-badge" style="background: #f59e0b20; color: #f59e0b; margin-bottom: 0.5rem;">
+                                                <i class="fas fa-crown"></i>
+                                                <span>High-Paying Task</span>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        <p style="color:#64748b; margin-bottom:1rem;">${description.substring(0, 80)}${description.length > 80 ? '...' : ''}</p>
+                                        
+                                        <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+                                            <span class="badge primary">${category}</span>
+                                            <span class="badge warning">${difficulty}</span>
+                                            ${isHighValue ? '<span class="badge danger"><i class="fas fa-star"></i> Premium</span>' : ''}
                                         </div>
-                                    ` : ''}
-                                    
-                                    <div style="display:flex; gap:0.5rem; justify-content:space-between;">
-                                        <button class="btn btn-secondary" onclick="viewTaskDetails('${task.id}')" style="padding:0.5rem 1rem; flex:1;">
-                                            <i class="fas fa-eye"></i> Details
-                                        </button>
-                                        ${!hasSubmitted ? 
-                                            (deadlinePassed ? 
-                                                `<button class="btn btn-disabled" disabled style="flex:2; opacity:0.6;">
-                                                    <i class="fas fa-ban"></i> Deadline Passed
-                                                </button>` : 
-                                                (canAccept ? 
+                                        
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                                            <span class="task-amount">$${rewardValue.toFixed(2)}</span>
+                                            ${isHighValue && userMembership !== MEMBERSHIP_TYPES.ELITE ? 
+                                                `<span class="badge primary" style="background:#6366f120;">
+                                                    <i class="fas fa-lock"></i> Elite Only
+                                                </span>` : ''}
+                                        </div>
+                                        
+                                        ${deadlinePassed && !hasSubmitted ? `
+                                            <div class="expired-message">
+                                                <i class="fas fa-clock"></i> Submission deadline has passed
+                                            </div>
+                                        ` : ''}
+                                        
+                                        <div style="display:flex; gap:0.5rem; justify-content:space-between;">
+                                            <button class="btn btn-secondary" onclick="viewTaskDetails('${task.id}')" style="padding:0.5rem 1rem; flex:1;">
+                                                <i class="fas fa-eye"></i> Details
+                                            </button>
+                                            ${!hasSubmitted ? 
+                                                (deadlinePassed ? 
+                                                    `<button class="btn btn-disabled" disabled style="flex:2; opacity:0.6;">
+                                                        <i class="fas fa-ban"></i> Deadline Passed
+                                                    </button>` : 
+                                                    // Check if user can accept the task
+                                                    (userMembership !== MEMBERSHIP_TYPES.ELITE && isHighValue) ?
+                                                    `<button class="btn btn-disabled" disabled style="flex:2; opacity:0.6;">
+                                                        <i class="fas fa-lock"></i> Elite Only
+                                                    </button>` :
                                                     `<button class="btn btn-accept" onclick="acceptTask('${task.id}')" style="flex:2;">
                                                         Accept Task
-                                                    </button>` :
-                                                    `<button class="btn btn-disabled" disabled style="flex:2; opacity:0.6;">
-                                                        <i class="fas fa-lock"></i> Elite Required
                                                     </button>`
-                                                )
-                                            ) : 
-                                            `<button class="btn btn-success" disabled style="flex:2; opacity:0.6;">
-                                                <i class="fas fa-check"></i> Completed
-                                            </button>`
-                                        }
+                                                ) : 
+                                                `<button class="btn btn-success" disabled style="flex:2; opacity:0.6;">
+                                                    <i class="fas fa-check"></i> Completed
+                                                </button>`
+                                            }
+                                        </div>
                                     </div>
-                                </div>
-                            `;
+                                `;
+                            }
+                            
+                            html += '</div>';
                         }
-                        
-                        html += '</div>';
                     }
                 }
                 
@@ -2456,26 +2520,11 @@
         }
         
         // Accept Task
-        async function acceptTask(taskId) {
-            try {
-                const taskDoc = await db.collection('tasks').doc(taskId).get();
-                const task = taskDoc.data();
-                const reward = parseFloat(task.reward) || 0;
-                
-                // Check membership restriction
-                if (userData.membershipType !== MEMBERSHIP_TYPES.ELITE && reward >= 3) {
-                    showAlert('This task requires Elite membership. Please upgrade to accept.', 'error');
-                    return;
-                }
-                
-                showSubmitForm(taskId);
-            } catch (error) {
-                console.error('Error accepting task:', error);
-                showAlert('Error loading task', 'error');
-            }
+        function acceptTask(taskId) {
+            showSubmitForm(taskId);
         }
         
-        // Show Submit Form
+        // Show Submit Form - Modified to check task value restrictions
         async function showSubmitForm(taskId) {
             try {
                 const taskDoc = await db.collection('tasks').doc(taskId).get();
@@ -2488,9 +2537,32 @@
                     return;
                 }
                 
-                const reward = parseFloat(task.reward) || 0;
-                if (userData.membershipType !== MEMBERSHIP_TYPES.ELITE && reward >= 3) {
-                    showAlert('This task requires Elite membership. Please upgrade to accept.', 'error');
+                // Check if user can submit this task based on reward value
+                const rewardValue = parseFloat(task.reward) || 0;
+                const userMembership = userData.membershipType || MEMBERSHIP_TYPES.BASIC;
+                
+                // If task is $3 or more and user is not Elite, block submission
+                if (rewardValue >= 3 && userMembership !== MEMBERSHIP_TYPES.ELITE) {
+                    showModal(`
+                        <div class="modal-content">
+                            <i class="fas fa-crown" style="font-size: 4rem; color: #f59e0b; margin-bottom: 1rem; display: block; text-align: center;"></i>
+                            <h3 style="margin-bottom:1rem; color:#0f172a; text-align: center;">Elite Only Task</h3>
+                            <p style="margin-bottom:1rem; text-align: center;">
+                                This task pays <strong>$${rewardValue.toFixed(2)}</strong> and requires Elite membership.
+                            </p>
+                            <p style="margin-bottom:1.5rem; text-align: center; color:#64748b;">
+                                Upgrade to Elite to access high-paying tasks and maximize your earnings!
+                            </p>
+                            <div style="display:flex; gap:1rem; margin-top:1.5rem; justify-content: center;">
+                                <button class="btn btn-primary" onclick="switchTab('withdrawals'); closeModal();">
+                                    <i class="fas fa-arrow-up"></i> Upgrade Now
+                                </button>
+                                <button class="btn btn-secondary" onclick="closeModal()">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    `);
                     return;
                 }
                 
@@ -2558,7 +2630,7 @@
             }
         }
         
-        // View Task Details
+        // View Task Details - Updated with membership requirement
         async function viewTaskDetails(taskId) {
             try {
                 const taskDoc = await db.collection('tasks').doc(taskId).get();
@@ -2596,6 +2668,11 @@
                 const difficulty = task.difficulty || 'medium';
                 const requirements = task.requirements || 'No specific requirements.';
                 const clientName = task.clientName || 'NextGen Admin';
+                
+                // Check membership requirement
+                const isHighValue = rewardValue >= 3;
+                const userMembership = userData.membershipType || MEMBERSHIP_TYPES.BASIC;
+                const canAccept = !isHighValue || userMembership === MEMBERSHIP_TYPES.ELITE;
                 
                 const pdfHtml = `
                     <div class="pdf-document">
@@ -2638,6 +2715,14 @@
                                         <i class="fas fa-dollar-sign"></i> $${rewardValue.toFixed(2)}
                                     </span>
                                 </div>
+                                ${isHighValue ? `
+                                    <div class="pdf-grid-item">
+                                        <span class="pdf-grid-label">Requirement</span>
+                                        <span class="pdf-grid-value">
+                                            <i class="fas fa-crown" style="color: #f59e0b;"></i> Elite Membership Required
+                                        </span>
+                                    </div>
+                                ` : ''}
                             </div>
                             
                             <div class="pdf-section">
@@ -2677,15 +2762,30 @@
                                 </div>
                             ` : ''}
                             
+                            ${isHighValue && !canAccept ? `
+                                <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                                    <i class="fas fa-crown" style="color: #f59e0b; font-size: 1.5rem;"></i>
+                                    <div>
+                                        <p style="font-weight: 600; color: #92400e;">Elite Membership Required</p>
+                                        <p style="color: #92400e; font-size: 0.9rem;">This high-paying task requires Elite membership. Upgrade to access tasks paying $3 and above.</p>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
                             <div style="display: flex; gap: 2rem; margin-bottom: 2rem; font-size: 0.9rem; color: #64748b;">
                                 <span><i class="far fa-calendar-alt"></i> Posted: ${createdDate}</span>
                                 <span><i class="far fa-clock"></i> Task ID: ${taskId}</span>
                             </div>
                             
                             <div class="pdf-actions">
-                                <button class="pdf-btn pdf-btn-primary" onclick="acceptTask('${taskId}')">
-                                    <i class="fas fa-check-circle"></i> Accept Task
-                                </button>
+                                ${canAccept ? 
+                                    `<button class="pdf-btn pdf-btn-primary" onclick="acceptTask('${taskId}')">
+                                        <i class="fas fa-check-circle"></i> Accept Task
+                                    </button>` : 
+                                    `<button class="pdf-btn pdf-btn-secondary" onclick="switchTab('withdrawals'); closeModal();">
+                                        <i class="fas fa-arrow-up"></i> Upgrade to Elite
+                                    </button>`
+                                }
                                 <button class="pdf-btn pdf-btn-secondary" onclick="closeModal()">
                                     <i class="fas fa-times"></i> Close
                                 </button>
@@ -2914,9 +3014,6 @@
                     const packageClass = type === MEMBERSHIP_TYPES.BASIC ? 'basic' : 
                                         type === MEMBERSHIP_TYPES.PREMIUM ? 'premium' : 'elite';
                     
-                    // Determine if this package is lower than current
-                    const isLower = getMembershipLevel(type) < getMembershipLevel(userData.membershipType);
-                    
                     // Build features list
                     let featuresHtml = '';
                     pkg.features.forEach(feature => {
@@ -2960,10 +3057,6 @@
                                 `<button class="package-btn current" disabled>
                                     <i class="fas fa-check"></i> Current Plan
                                 </button>` : 
-                                isLower ?
-                                `<button class="package-btn ${packageClass}" disabled style="opacity:0.6; cursor:not-allowed;" onclick="event.stopPropagation(); showAlert('You cannot downgrade your membership', 'error');">
-                                    <i class="fas fa-ban"></i> Not Available
-                                </button>` :
                                 `<button class="package-btn ${packageClass}" 
                                          onclick="selectMembership('${type}')">
                                     <i class="fas fa-arrow-right"></i> 
@@ -3376,12 +3469,6 @@
         
         // Select membership package
         function selectMembership(membershipType) {
-            // Prevent downgrading
-            if (getMembershipLevel(membershipType) < getMembershipLevel(userData.membershipType)) {
-                showAlert('You cannot downgrade your membership.', 'error');
-                return;
-            }
-            
             if (membershipType === MEMBERSHIP_TYPES.BASIC) {
                 // Basic is free, just update membership
                 updateMembership(membershipType);
