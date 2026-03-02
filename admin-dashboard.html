@@ -1,53 +1,53 @@
-<!DOCTYPE html>  
-<html lang="en">  
-<head>  
-    <meta charset="UTF-8">  
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">  
-    <title>NextGen · Admin Dashboard</title>  
-    <!-- Firebase -->  
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>  
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>  
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>  
-    <!-- Font Awesome -->  
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
-    <!-- Google Fonts -->  
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">  
-    <style>  
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }  
-        body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }  
-        .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }  
-        .header { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 2rem; padding: 1rem 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; color: white; }  
-        .logo h2 { background: linear-gradient(135deg, #818cf8, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }  
-        .admin-badge { background: #ef4444; padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.9rem; }  
-        .logout-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }  
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }  
-        .stat-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 1.5rem; padding: 1.5rem; color: white; border: 1px solid rgba(255,255,255,0.2); }  
-        .stat-card i { font-size: 2rem; color: #818cf8; margin-bottom: 0.5rem; }  
-        .stat-value { font-size: 2rem; font-weight: 700; }  
-        .tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }  
-        .tab { padding: 0.8rem 1.5rem; border: none; border-radius: 40px; background: rgba(255,255,255,0.1); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; }  
-        .tab.active { background: #6366f1; }  
-        .content { background: white; border-radius: 2rem; padding: 2rem; min-height: 500px; }  
-        .data-table { width: 100%; border-collapse: collapse; }  
-        .data-table th { text-align: left; padding: 1rem; background: #f8fafc; }  
-        .data-table td { padding: 1rem; border-bottom: 1px solid #e2e8f0; }  
-        .badge { padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.8rem; font-weight: 600; display: inline-block; }  
-        .badge.success { background: #10b98120; color: #10b981; border: 1px solid #10b981; }  
-        .badge.warning { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b; }  
-        .badge.danger { background: #ef444420; color: #ef4444; border: 1px solid #ef4444; }  
-        .badge.primary { background: #6366f120; color: #6366f1; border: 1px solid #6366f1; }  
-        .badge.info { background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f6; }  
-        .btn { padding: 0.5rem 1rem; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; margin: 0.2rem; pointer-events: auto; }  
-        .btn-primary { background: #6366f1; color: white; }  
-        .btn-success { background: #10b981; color: white; }  
-        .btn-danger { background: #ef4444; color: white; }  
-        .btn-warning { background: #f59e0b; color: white; }  
-        .btn-info { background: #3b82f6; color: white; }  
-        .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }  
-        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 2rem; padding: 2rem; max-width: 600px; width: 90%; z-index: 1000; max-height: 80vh; overflow-y: auto; }  
-        .modal.active { display: block; }  
-        .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 999; }  
-        .modal-backdrop.active { display: block; }  
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NextGen · Admin Dashboard</title>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
+        .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+        .header { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 2rem; padding: 1rem 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; color: white; }
+        .logo h2 { background: linear-gradient(135deg, #818cf8, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .admin-badge { background: #ef4444; padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.9rem; }
+        .logout-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 1.5rem; padding: 1.5rem; color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .stat-card i { font-size: 2rem; color: #818cf8; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 2rem; font-weight: 700; }
+        .tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .tab { padding: 0.8rem 1.5rem; border: none; border-radius: 40px; background: rgba(255,255,255,0.1); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .tab.active { background: #6366f1; }
+        .content { background: white; border-radius: 2rem; padding: 2rem; min-height: 500px; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { text-align: left; padding: 1rem; background: #f8fafc; }
+        .data-table td { padding: 1rem; border-bottom: 1px solid #e2e8f0; }
+        .badge { padding: 0.3rem 1rem; border-radius: 40px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
+        .badge.success { background: #10b98120; color: #10b981; border: 1px solid #10b981; }
+        .badge.warning { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b; }
+        .badge.danger { background: #ef444420; color: #ef4444; border: 1px solid #ef4444; }
+        .badge.primary { background: #6366f120; color: #6366f1; border: 1px solid #6366f1; }
+        .badge.info { background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f6; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; margin: 0.2rem; pointer-events: auto; }
+        .btn-primary { background: #6366f1; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-info { background: #3b82f6; color: white; }
+        .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 2rem; padding: 2rem; max-width: 600px; width: 90%; z-index: 1000; max-height: 80vh; overflow-y: auto; }
+        .modal.active { display: block; }
+        .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 999; }
+        .modal-backdrop.active { display: block; }
         
         /* Alert Modal Styles */
         .alert-modal {
@@ -1418,6 +1418,25 @@
                 submissionsCount: 0,  
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()  
             });  
+
+            // NEW: Send notification to all users about new task  
+            const taskLink = `task:${taskId}`; // we'll need the taskId – we can get it after add, but we don't have it.  
+            // We'll get the taskId from the returned DocumentReference.  
+            // But since this is async, we can do after creation. However, we can also just send a general notification without link.  
+            // Let's modify to get taskId after add.  
+            try {  
+                const taskRef = await db.collection('tasks').add({ ... });  
+                const taskId = taskRef.id;  
+                await sendNotificationToAll(  
+                    'New Task Available',  
+                    `A new task "${title}" paying $${reward} has been posted.`,  
+                    'task',  
+                    `task:${taskId}`  
+                );  
+            } catch (error) {  
+                console.error('Error creating task or sending notification:', error);  
+                showAlert('Task created but notification failed', 'warning');  
+            }  
               
             closeModal();  
             showAlert('Task created successfully', 'success');  
@@ -1675,11 +1694,34 @@
                     tasksCompleted: firebase.firestore.FieldValue.increment(1)  
                 });  
                 showAlert(`Submission approved! User earned $${earned.toFixed(2)}`, 'success');  
+
+                // NEW: Send notification to user  
+                await sendNotification(  
+                    sub.userId,  
+                    'Submission Approved',  
+                    `Your submission for task "${sub.taskTitle}" has been approved! You earned $${earned.toFixed(2)}.`,  
+                    'submission',  
+                    `submission:${subId}`  
+                );  
             } else if (approved && score < 50) {  
                 status = 'rejected';  
                 showAlert('Submission rejected (score below 50%)', 'warning');  
+                await sendNotification(  
+                    sub.userId,  
+                    'Submission Rejected',  
+                    `Your submission for task "${sub.taskTitle}" was rejected because the score (${score}) was below 50%. Feedback: ${review}`,  
+                    'submission',  
+                    `submission:${subId}`  
+                );  
             } else {  
                 showAlert('Submission rejected', 'info');  
+                await sendNotification(  
+                    sub.userId,  
+                    'Submission Rejected',  
+                    `Your submission for task "${sub.taskTitle}" has been rejected. Feedback: ${review}`,  
+                    'submission',  
+                    `submission:${subId}`  
+                );  
             }  
               
             await db.collection('submissions').doc(subId).update({  
@@ -2384,6 +2426,15 @@
                     // Add welcome bonus
                     userUpdate.wallet = firebase.firestore.FieldValue.increment(pkg.welcomeBonus);
                     userUpdate.eliteBonusApplied = true;
+
+                    // NEW: Send notification about welcome bonus
+                    await sendNotification(
+                        userId,
+                        'Welcome to Elite!',
+                        `Your Elite membership is active! You've received a $${pkg.welcomeBonus} welcome bonus.`,
+                        'membership',
+                        null
+                    );
                 }
 
                 if (membershipType === MEMBERSHIP_TYPES.PREMIUM && pkg.duration === 'annual') {
@@ -2471,6 +2522,22 @@
                                 });
                             }
                         });
+
+                        // NEW: Send notifications to both users
+                        await sendNotification(
+                            referrerId,
+                            'Referral Bonus!',
+                            `Your referral just upgraded to Premium! You earned $${REFERRAL_BONUS_REFERRER}.`,
+                            'referral',
+                            null
+                        );
+                        await sendNotification(
+                            userId,
+                            'Referral Bonus!',
+                            `You earned $${REFERRAL_BONUS_REFERRED} for upgrading!`,
+                            'referral',
+                            null
+                        );
                     }
                 }
 
@@ -2500,6 +2567,15 @@
                     status: 'rejected',
                     rejectedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });  
+
+                // NEW: Send notification
+                await sendNotification(
+                    userId,
+                    'Membership Payment Rejected',
+                    `Your ${payment.membershipType} payment could not be verified. Please contact support.`,
+                    'membership',
+                    null
+                );
                   
                 showAlert(`Membership ${payment.membershipType} rejected`, 'info');  
                 loadMemberships();  
@@ -3294,7 +3370,61 @@
             }  
         }  
           
-        // Load Messages  
+        // ========== NEW NOTIFICATION FUNCTIONS ==========
+
+        // Send a notification to a specific user
+        async function sendNotification(userId, title, message, type = 'info', link = null) {
+            try {
+                const notificationData = {
+                    userId: userId,
+                    title: title,
+                    message: message,
+                    type: type,
+                    read: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                if (link) {
+                    notificationData.link = link;
+                }
+                await db.collection('notifications').add(notificationData);
+                return true;
+            } catch (error) {
+                console.error('Error sending notification:', error);
+                return false;
+            }
+        }
+
+        // Send notification to all users (broadcast)
+        async function sendNotificationToAll(title, message, type = 'info', link = null) {
+            try {
+                const usersSnapshot = await db.collection('users').get();
+                const batch = db.batch();
+                usersSnapshot.forEach(userDoc => {
+                    const notifRef = db.collection('notifications').doc();
+                    const notificationData = {
+                        userId: userDoc.id,
+                        title: title,
+                        message: message,
+                        type: type,
+                        read: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    if (link) {
+                        notificationData.link = link;
+                    }
+                    batch.set(notifRef, notificationData);
+                });
+                await batch.commit();
+                return true;
+            } catch (error) {
+                console.error('Error broadcasting notifications:', error);
+                return false;
+            }
+        }
+
+        // ========== END NEW NOTIFICATION FUNCTIONS ==========
+          
+        // Load Messages (updated with notification sending options)
         async function loadMessages() {  
             const users = await db.collection('users').get();  
               
@@ -3362,6 +3492,53 @@
                         </button>  
                     </div>  
                 </div>  
+
+                <!-- NEW: Send Notification Forms -->
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">  
+                    <button class="btn btn-success" id="individualNotificationBtn">🔔 Send Individual Notification</button>  
+                    <button class="btn btn-warning" id="broadcastNotificationBtn">🔔 Broadcast Notification</button>  
+                </div>  
+
+                <div id="individualNotificationForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: none;">  
+                    <h4 style="margin-bottom:1rem;">Send Individual Notification</h4>  
+                    <select id="notifUser">  
+                        <option value="">Select User</option>  
+                        ${options}  
+                    </select>  
+                    <input type="text" id="notifTitle" placeholder="Notification Title">  
+                    <textarea id="notifMessage" placeholder="Notification Message"></textarea>  
+                    <select id="notifType">  
+                        <option value="info">Info</option>  
+                        <option value="success">Success</option>  
+                        <option value="warning">Warning</option>  
+                        <option value="error">Error</option>  
+                        <option value="task">Task</option>  
+                        <option value="submission">Submission</option>  
+                        <option value="withdrawal">Withdrawal</option>  
+                        <option value="referral">Referral</option>  
+                    </select>  
+                    <input type="text" id="notifLink" placeholder="Deep link (e.g., task:123, submission:456) - optional">  
+                    <button class="btn btn-success" id="sendIndividualNotifBtn">Send Notification</button>  
+                </div>  
+
+                <div id="broadcastNotificationForm" style="background:#f8fafc; padding:1.5rem; border-radius:1rem; margin-bottom:2rem; display: none;">  
+                    <h4 style="margin-bottom:1rem; color: #f59e0b;">Broadcast Notification to All Users</h4>  
+                    <div style="background: #f59e0b20; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">  
+                        <p style="margin: 0;"><strong>⚠️ Important:</strong> This notification will be sent to ALL registered users (${users.size} users total).</p>  
+                    </div>  
+                    <input type="text" id="broadcastNotifTitle" placeholder="Notification Title">  
+                    <textarea id="broadcastNotifMessage" placeholder="Notification Message"></textarea>  
+                    <select id="broadcastNotifType">  
+                        <option value="info">Info</option>  
+                        <option value="success">Success</option>  
+                        <option value="warning">Warning</option>  
+                        <option value="error">Error</option>  
+                        <option value="task">Task</option>  
+                        <option value="announcement">Announcement</option>  
+                    </select>  
+                    <input type="text" id="broadcastNotifLink" placeholder="Deep link (optional)">  
+                    <button class="btn btn-warning" id="sendBroadcastNotifBtn">Broadcast Notification</button>  
+                </div>  
                   
                 <h4 style="margin-bottom:1rem; display: flex; justify-content: space-between; align-items: center;">  
                     <span>Recent Messages</span>  
@@ -3397,6 +3574,9 @@
                 message,  
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()  
             });  
+
+            // Also send a notification  
+            await sendNotification(userId, 'New Message from Admin', message, 'message', null);  
               
             showAlert('Message sent successfully', 'success');  
             document.getElementById('messageText').value = '';  
@@ -3515,6 +3695,89 @@
                 <p style="margin-top: 1rem; color: #6b7280;">This is how users will see your broadcast message.</p>  
                 <button class="btn btn-primary" onclick="closeModal()" style="width: 100%;">Close Preview</button>  
             `);  
+        }  
+
+        // NEW: Send Individual Notification  
+        async function sendIndividualNotification() {  
+            const userId = document.getElementById('notifUser').value;  
+            const title = document.getElementById('notifTitle').value;  
+            const message = document.getElementById('notifMessage').value;  
+            const type = document.getElementById('notifType').value;  
+            const link = document.getElementById('notifLink').value || null;  
+              
+            if (!userId) {  
+                showAlert('Please select a user', 'error');  
+                return;  
+            }  
+              
+            if (!title || !message) {  
+                showAlert('Please enter both title and message', 'error');  
+                return;  
+            }  
+              
+            const success = await sendNotification(userId, title, message, type, link);  
+            if (success) {  
+                showAlert('Notification sent successfully!', 'success');  
+                document.getElementById('notifTitle').value = '';  
+                document.getElementById('notifMessage').value = '';  
+                document.getElementById('notifLink').value = '';  
+                // Optionally close the form or keep it open  
+            } else {  
+                showAlert('Failed to send notification', 'error');  
+            }  
+        }  
+
+        // NEW: Send Broadcast Notification  
+        async function sendBroadcastNotification() {  
+            const title = document.getElementById('broadcastNotifTitle').value;  
+            const message = document.getElementById('broadcastNotifMessage').value;  
+            const type = document.getElementById('broadcastNotifType').value;  
+            const link = document.getElementById('broadcastNotifLink').value || null;  
+              
+            if (!title || !message) {  
+                showAlert('Please enter both title and message', 'error');  
+                return;  
+            }  
+              
+            // Confirm with modal  
+            showModal(`  
+                <h3 style="margin-bottom:1rem; color: #f59e0b;">Confirm Broadcast Notification</h3>  
+                <div style="background: #f59e0b20; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">  
+                    <p><strong>⚠️ You are about to send a notification to ALL users</strong></p>  
+                    <p>This action cannot be undone. Please review:</p>  
+                </div>  
+                  
+                <p><strong>Title:</strong> ${title}</p>  
+                <p><strong>Message:</strong> ${message}</p>  
+                <p><strong>Type:</strong> ${type}</p>  
+                ${link ? `<p><strong>Link:</strong> ${link}</p>` : ''}  
+                  
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">  
+                    <button class="btn btn-success" id="confirmBroadcastNotifBtn">Yes, Send to All</button>  
+                    <button class="btn btn-danger" onclick="closeModal()">Cancel</button>  
+                </div>  
+            `);  
+        }  
+
+        // Execute Broadcast Notification  
+        async function executeBroadcastNotification() {  
+            const title = document.getElementById('broadcastNotifTitle').value;  
+            const message = document.getElementById('broadcastNotifMessage').value;  
+            const type = document.getElementById('broadcastNotifType').value;  
+            const link = document.getElementById('broadcastNotifLink').value || null;  
+              
+            closeModal();  
+            showAlert('Sending broadcast...', 'info', 'Please Wait');  
+              
+            const success = await sendNotificationToAll(title, message, type, link);  
+            if (success) {  
+                showAlert('Broadcast notification sent!', 'success');  
+                document.getElementById('broadcastNotifTitle').value = '';  
+                document.getElementById('broadcastNotifMessage').value = '';  
+                document.getElementById('broadcastNotifLink').value = '';  
+            } else {  
+                showAlert('Failed to send broadcast', 'error');  
+            }  
         }  
           
         // Event Delegation for all buttons  
@@ -3763,6 +4026,40 @@
                 closeModal();  
                 return;  
             }  
+
+            // NEW: Toggle Individual Notification Form  
+            if (target.id === 'individualNotificationBtn') {  
+                const form = document.getElementById('individualNotificationForm');  
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';  
+                document.getElementById('broadcastNotificationForm').style.display = 'none';  
+                return;  
+            }  
+
+            // NEW: Toggle Broadcast Notification Form  
+            if (target.id === 'broadcastNotificationBtn') {  
+                const form = document.getElementById('broadcastNotificationForm');  
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';  
+                document.getElementById('individualNotificationForm').style.display = 'none';  
+                return;  
+            }  
+
+            // NEW: Send Individual Notification  
+            if (target.id === 'sendIndividualNotifBtn') {  
+                await sendIndividualNotification();  
+                return;  
+            }  
+
+            // NEW: Send Broadcast Notification (opens confirmation modal)  
+            if (target.id === 'sendBroadcastNotifBtn') {  
+                await sendBroadcastNotification();  
+                return;  
+            }  
+
+            // NEW: Confirm Broadcast Notification  
+            if (target.id === 'confirmBroadcastNotifBtn') {  
+                await executeBroadcastNotification();  
+                return;  
+            }  
         });  
           
         // Make functions globally available  
@@ -3802,6 +4099,12 @@
         window.sendBroadcast = sendBroadcast;  
         window.executeBroadcast = executeBroadcast;  
         window.previewBroadcast = previewBroadcast;  
+        // NEW functions  
+        window.sendNotification = sendNotification;  
+        window.sendNotificationToAll = sendNotificationToAll;  
+        window.sendIndividualNotification = sendIndividualNotification;  
+        window.sendBroadcastNotification = sendBroadcastNotification;  
+        window.executeBroadcastNotification = executeBroadcastNotification;  
     </script>  
 </body>  
 </html>
