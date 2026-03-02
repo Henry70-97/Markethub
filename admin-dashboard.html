@@ -13,7 +13,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ... (keep all existing styles unchanged) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
         .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
@@ -3372,11 +3371,12 @@
             }  
         }  
           
-        // ========== NOTIFICATION FUNCTIONS ==========
+        // ========== ENHANCED NOTIFICATION FUNCTIONS ==========
 
         // Send a notification to a specific user
         async function sendNotification(userId, title, message, type = 'info', link = null) {
             try {
+                console.log(`Sending notification to user ${userId}: ${title}`);
                 const notificationData = {
                     userId: userId,
                     title: title,
@@ -3388,20 +3388,36 @@
                 if (link) {
                     notificationData.link = link;
                 }
-                await db.collection('notifications').add(notificationData);
+                const docRef = await db.collection('notifications').add(notificationData);
+                console.log(`Notification sent successfully, ID: ${docRef.id}`);
                 return true;
             } catch (error) {
                 console.error('Error sending notification:', error);
+                // Show a more specific error message
+                if (error.code === 'permission-denied') {
+                    showAlert('Firebase permission denied: Check security rules for "notifications" collection.', 'error');
+                } else if (error.code === 'not-found') {
+                    showAlert('Notifications collection does not exist. It will be created automatically, but check Firestore indexes.', 'error');
+                } else {
+                    showAlert('Failed to send notification: ' + error.message, 'error');
+                }
                 return false;
             }
         }
 
-        // Send notification to all users (broadcast)
+        // Send notification to all users (broadcast) with batch handling
         async function sendNotificationToAll(title, message, type = 'info', link = null) {
             try {
+                console.log(`Broadcasting notification to all users: ${title}`);
                 const usersSnapshot = await db.collection('users').get();
-                const batch = db.batch();
-                usersSnapshot.forEach(userDoc => {
+                console.log(`Found ${usersSnapshot.size} users`);
+
+                // If there are many users, we need to batch in chunks (Firestore batch limit is 500)
+                const batchSize = 400; // leave some room
+                let batch = db.batch();
+                let operationCount = 0;
+
+                for (const userDoc of usersSnapshot.docs) {
                     const notifRef = db.collection('notifications').doc();
                     const notificationData = {
                         userId: userDoc.id,
@@ -3415,16 +3431,39 @@
                         notificationData.link = link;
                     }
                     batch.set(notifRef, notificationData);
-                });
-                await batch.commit();
+                    operationCount++;
+
+                    // Commit batch every 400 writes
+                    if (operationCount >= batchSize) {
+                        await batch.commit();
+                        console.log(`Committed batch of ${operationCount} notifications`);
+                        batch = db.batch();
+                        operationCount = 0;
+                    }
+                }
+
+                // Commit any remaining writes
+                if (operationCount > 0) {
+                    await batch.commit();
+                    console.log(`Committed final batch of ${operationCount} notifications`);
+                }
+
+                console.log('Broadcast notification completed successfully');
                 return true;
             } catch (error) {
                 console.error('Error broadcasting notifications:', error);
+                if (error.code === 'permission-denied') {
+                    showAlert('Firebase permission denied when broadcasting notifications. Check security rules.', 'error');
+                } else if (error.code === 'not-found') {
+                    showAlert('Notifications collection not found. It will be created on first write, but check Firestore indexes.', 'error');
+                } else {
+                    showAlert('Failed to broadcast notifications: ' + error.message, 'error');
+                }
                 return false;
             }
         }
 
-        // ========== END NOTIFICATION FUNCTIONS ==========
+        // ========== END ENHANCED NOTIFICATION FUNCTIONS ==========
           
         // Load Messages (updated with notification sending options)
         async function loadMessages() {  
