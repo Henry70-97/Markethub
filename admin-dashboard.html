@@ -13,6 +13,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ... (keep all existing styles unchanged) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
         .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
@@ -910,8 +911,13 @@
             document.getElementById('adminName').textContent = doc.data().displayName;  
             
             // Load settings
-            await loadMembershipPackages();
-            await loadFeeSettings();
+            try {
+                await loadMembershipPackages();
+                await loadFeeSettings();
+            } catch (e) {
+                console.error('Error loading settings:', e);
+                showAlert('Error loading settings. Some features may not work.', 'error');
+            }
               
             loadDashboard();  
         });  
@@ -1382,7 +1388,7 @@
             `);  
         }  
           
-        // Create Task  
+        // Create Task (FIXED: properly assign taskRef and use taskId)  
         async function createTask() {  
             const title = document.getElementById('taskTitle').value;  
             const description = document.getElementById('taskDescription').value;  
@@ -1403,44 +1409,40 @@
             const deadlineDate = new Date(deadline);  
             deadlineDate.setHours(23, 59, 59, 999); // End of the selected day  
               
-            await db.collection('tasks').add({  
-                title,  
-                description,  
-                clientName: clientName || 'NextGen',  
-                requirements,  
-                instructions,  
-                deadline: firebase.firestore.Timestamp.fromDate(deadlineDate),  
-                reward,  
-                rewardKES: reward * (feeSettings?.exchangeRate || 130),  
-                category,  
-                difficulty,  
-                active: true,  
-                submissionsCount: 0,  
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()  
-            });  
-
-            // NEW: Send notification to all users about new task  
-            const taskLink = `task:${taskId}`; // we'll need the taskId – we can get it after add, but we don't have it.  
-            // We'll get the taskId from the returned DocumentReference.  
-            // But since this is async, we can do after creation. However, we can also just send a general notification without link.  
-            // Let's modify to get taskId after add.  
             try {  
-                const taskRef = await db.collection('tasks').add({ ... });  
+                const taskRef = await db.collection('tasks').add({  
+                    title,  
+                    description,  
+                    clientName: clientName || 'NextGen',  
+                    requirements,  
+                    instructions,  
+                    deadline: firebase.firestore.Timestamp.fromDate(deadlineDate),  
+                    reward,  
+                    rewardKES: reward * (feeSettings?.exchangeRate || 130),  
+                    category,  
+                    difficulty,  
+                    active: true,  
+                    submissionsCount: 0,  
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()  
+                });  
+
                 const taskId = taskRef.id;  
+
+                // Send notification to all users about new task  
                 await sendNotificationToAll(  
                     'New Task Available',  
                     `A new task "${title}" paying $${reward} has been posted.`,  
                     'task',  
                     `task:${taskId}`  
                 );  
+
+                closeModal();  
+                showAlert('Task created successfully', 'success');  
+                loadTasks();  
             } catch (error) {  
                 console.error('Error creating task or sending notification:', error);  
-                showAlert('Task created but notification failed', 'warning');  
+                showAlert('Error creating task: ' + error.message, 'error');  
             }  
-              
-            closeModal();  
-            showAlert('Task created successfully', 'success');  
-            loadTasks();  
         }  
           
         // Toggle Task  
@@ -1695,7 +1697,7 @@
                 });  
                 showAlert(`Submission approved! User earned $${earned.toFixed(2)}`, 'success');  
 
-                // NEW: Send notification to user  
+                // Send notification to user  
                 await sendNotification(  
                     sub.userId,  
                     'Submission Approved',  
@@ -2427,7 +2429,7 @@
                     userUpdate.wallet = firebase.firestore.FieldValue.increment(pkg.welcomeBonus);
                     userUpdate.eliteBonusApplied = true;
 
-                    // NEW: Send notification about welcome bonus
+                    // Send notification about welcome bonus
                     await sendNotification(
                         userId,
                         'Welcome to Elite!',
@@ -2523,7 +2525,7 @@
                             }
                         });
 
-                        // NEW: Send notifications to both users
+                        // Send notifications to both users
                         await sendNotification(
                             referrerId,
                             'Referral Bonus!',
@@ -2568,7 +2570,7 @@
                     rejectedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });  
 
-                // NEW: Send notification
+                // Send notification
                 await sendNotification(
                     userId,
                     'Membership Payment Rejected',
@@ -3370,7 +3372,7 @@
             }  
         }  
           
-        // ========== NEW NOTIFICATION FUNCTIONS ==========
+        // ========== NOTIFICATION FUNCTIONS ==========
 
         // Send a notification to a specific user
         async function sendNotification(userId, title, message, type = 'info', link = null) {
@@ -3422,7 +3424,7 @@
             }
         }
 
-        // ========== END NEW NOTIFICATION FUNCTIONS ==========
+        // ========== END NOTIFICATION FUNCTIONS ==========
           
         // Load Messages (updated with notification sending options)
         async function loadMessages() {  
@@ -3493,7 +3495,7 @@
                     </div>  
                 </div>  
 
-                <!-- NEW: Send Notification Forms -->
+                <!-- Send Notification Forms -->
                 <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">  
                     <button class="btn btn-success" id="individualNotificationBtn">🔔 Send Individual Notification</button>  
                     <button class="btn btn-warning" id="broadcastNotificationBtn">🔔 Broadcast Notification</button>  
@@ -3697,7 +3699,7 @@
             `);  
         }  
 
-        // NEW: Send Individual Notification  
+        // Send Individual Notification  
         async function sendIndividualNotification() {  
             const userId = document.getElementById('notifUser').value;  
             const title = document.getElementById('notifTitle').value;  
@@ -3721,13 +3723,12 @@
                 document.getElementById('notifTitle').value = '';  
                 document.getElementById('notifMessage').value = '';  
                 document.getElementById('notifLink').value = '';  
-                // Optionally close the form or keep it open  
             } else {  
                 showAlert('Failed to send notification', 'error');  
             }  
         }  
 
-        // NEW: Send Broadcast Notification  
+        // Send Broadcast Notification  
         async function sendBroadcastNotification() {  
             const title = document.getElementById('broadcastNotifTitle').value;  
             const message = document.getElementById('broadcastNotifMessage').value;  
@@ -3780,286 +3781,291 @@
             }  
         }  
           
-        // Event Delegation for all buttons  
+        // Event Delegation for all buttons (wrapped in try/catch to log errors)  
         document.addEventListener('click', async (e) => {  
-            const target = e.target;  
+            try {  
+                const target = e.target;  
             
-            // Handle referral card clicks (but not when clicking on buttons inside)
-            if (target.classList.contains('referral-card') && !target.closest('button')) {
-                // The click is handled by the onclick attribute
-                return;
-            }
-              
-            // Logout button  
-            if (target.id === 'logoutBtn' || target.closest('#logoutBtn')) {  
-                logout();  
-                return;  
-            }  
-              
-            // Tab buttons  
-            if (target.classList.contains('tab') || target.closest('.tab')) {  
-                const tab = target.closest('.tab') || target;  
-                const tabName = tab.getAttribute('data-tab');  
-                if (tabName) {  
-                    switchTab(tabName);  
+                // Handle referral card clicks (but not when clicking on buttons inside)
+                if (target.classList.contains('referral-card') && !target.closest('button')) {
+                    // The click is handled by the onclick attribute
+                    return;
+                }
+                  
+                // Logout button  
+                if (target.id === 'logoutBtn' || target.closest('#logoutBtn')) {  
+                    logout();  
+                    return;  
                 }  
-                return;  
-            }  
-              
-            // Close modal button  
-            if (target.id === 'closeModalBtn' || target.closest('#closeModalBtn') || target.classList.contains('modal-backdrop')) {  
-                closeModal();  
-                return;  
-            }  
-              
-            // Adjust Wallet button  
-            if (target.classList.contains('adjust-wallet-btn')) {  
-                const userId = target.getAttribute('data-user-id');  
-                const userName = target.getAttribute('data-user-name');  
-                const wallet = target.getAttribute('data-wallet');  
-                showAdjustWallet(userId, userName, parseFloat(wallet || 0));  
-                return;  
-            }  
-              
-            // Apply Adjustment button (inside modal)  
-            if (target.classList.contains('apply-adjustment-btn')) {  
-                const userId = target.getAttribute('data-user-id');  
-                await adjustWallet(userId);  
-                return;  
-            }  
-              
-            // Toggle User Status  
-            if (target.classList.contains('toggle-status-btn')) {  
-                const userId = target.getAttribute('data-user-id');  
-                const newStatus = target.getAttribute('data-new-status') === 'true';  
-                await toggleUserStatus(userId, newStatus);  
-                return;  
-            }  
-              
-            // Make Admin  
-            if (target.classList.contains('make-admin-btn')) {  
-                const userId = target.getAttribute('data-user-id');  
-                await makeAdmin(userId);  
-                return;  
-            }  
-              
-            // Create Task button  
-            if (target.id === 'createTaskBtn') {  
-                showCreateTask();  
-                return;  
-            }  
-              
-            // Create Task Confirm button  
-            if (target.id === 'createTaskConfirmBtn') {  
-                await createTask();  
-                return;  
-            }  
-              
-            // Edit Task button  
-            if (target.classList.contains('edit-task-btn')) {  
-                const taskId = target.getAttribute('data-task-id');  
-                await editTask(taskId);  
-                return;  
-            }  
-              
-            // Update Task button  
-            if (target.id === 'updateTaskBtn') {  
-                const taskId = target.getAttribute('data-task-id');  
-                await updateTask(taskId);  
-                return;  
-            }  
-              
-            // Toggle Task button  
-            if (target.classList.contains('toggle-task-btn')) {  
-                const taskId = target.getAttribute('data-task-id');  
-                const newStatus = target.getAttribute('data-new-status') === 'true';  
-                await toggleTask(taskId, newStatus);  
-                return;  
-            }  
-              
-            // View Requirements button  
-            if (target.classList.contains('view-requirements-btn')) {  
-                const taskId = target.getAttribute('data-task-id');  
-                await viewRequirements(taskId);  
-                return;  
-            }  
-              
-            // Approve Submission  
-            if (target.classList.contains('approve-submission')) {  
-                const subId = target.getAttribute('data-sub-id');  
-                await reviewSubmission(subId, true);  
-                return;  
-            }  
-              
-            // Reject Submission  
-            if (target.classList.contains('reject-submission')) {  
-                const subId = target.getAttribute('data-sub-id');  
-                await reviewSubmission(subId, false);  
-                return;  
-            }  
-              
-            // Process Withdrawal  
-            if (target.classList.contains('process-withdrawal')) {  
-                const withdrawalId = target.getAttribute('data-withdrawal-id');  
-                await processWithdrawal(withdrawalId);  
-                return;  
-            }  
-              
-            // Approve Membership  
-            if (target.classList.contains('approve-membership')) {  
-                const userId = target.getAttribute('data-user-id');  
-                const paymentId = target.getAttribute('data-payment-id');  
-                await approveMembership(userId, paymentId);  
-                return;  
-            }  
-              
-            // Reject Membership  
-            if (target.classList.contains('reject-membership')) {  
-                const userId = target.getAttribute('data-user-id');  
-                const paymentId = target.getAttribute('data-payment-id');  
-                await rejectMembership(userId, paymentId);  
-                return;  
-            }  
-            
-            // Edit Packages button
-            if (target.classList.contains('edit-packages-btn') || target.id === 'editPackagesBtn' || 
-                (target.closest('button') && target.closest('button').textContent.includes('Edit Packages'))) {
-                showEditPackages();
-                return;
-            }
-            
-            // Save Packages button
-            if (target.id === 'savePackagesBtn' || (target.closest('button') && target.closest('button').id === 'savePackagesBtn')) {
-                e.preventDefault();
-                await savePackages();
-                return;
-            }
-            
-            // Edit Fee Settings button
-            if (target.id === 'editFeeSettingsBtn' || (target.closest('button') && target.closest('button').textContent.includes('Edit Fee Settings'))) {
-                showEditFeeSettings();
-                return;
-            }
-            
-            // Save Fee Settings button
-            if (target.id === 'saveFeeSettingsBtn' || (target.closest('button') && target.closest('button').id === 'saveFeeSettingsBtn')) {
-                e.preventDefault();
-                await saveFeeSettings();
-                return;
-            }
-              
-            // Credit Referral button  
-            if (target.classList.contains('credit-referral-btn')) {  
-                const referralId = target.getAttribute('data-referral-id');  
-                const referrerId = target.getAttribute('data-referrer-id');  
-                const referredId = target.getAttribute('data-referred-id');  
-                const referredEmail = target.getAttribute('data-referred-email');  
-                await creditReferralBonus(referralId, referrerId, referredId, referredEmail);  
-                return;  
-            }  
-              
-            // Confirm Credit button (in modal)  
-            if (target.id === 'confirmCreditBtn') {  
-                const referralId = target.getAttribute('data-referral-id');  
-                const referrerId = target.getAttribute('data-referrer-id');  
-                const referredId = target.getAttribute('data-referred-id');  
-                const referredEmail = target.getAttribute('data-referred-email');  
-                await executeCreditBonus(referralId, referrerId, referredId, referredEmail);  
-                return;  
-            }  
-              
-            // Reject Referral button  
-            if (target.classList.contains('reject-referral-btn')) {  
-                const referralId = target.getAttribute('data-referral-id');  
-                if (confirm('Are you sure you want to reject this referral?')) {  
-                    await rejectReferral(referralId);  
+                  
+                // Tab buttons  
+                if (target.classList.contains('tab') || target.closest('.tab')) {  
+                    const tab = target.closest('.tab') || target;  
+                    const tabName = tab.getAttribute('data-tab');  
+                    if (tabName) {  
+                        switchTab(tabName);  
+                    }  
+                    return;  
                 }  
-                return;  
-            }  
-              
-            // Send Individual Message  
-            if (target.id === 'sendMessageBtn') {  
-                await sendMessage();  
-                return;  
-            }  
-              
-            // Individual Message button  
-            if (target.id === 'individualMessageBtn') {  
-                currentMessageType = 'individual';  
-                document.getElementById('individualMessageForm').style.display = 'block';  
-                document.getElementById('broadcastMessageForm').style.display = 'none';  
-                target.classList.add('btn-primary');  
-                document.getElementById('broadcastMessageBtn').classList.remove('btn-primary');  
-                return;  
-            }  
-              
-            // Broadcast Message button  
-            if (target.id === 'broadcastMessageBtn') {  
-                currentMessageType = 'broadcast';  
-                document.getElementById('broadcastMessageForm').style.display = 'block';  
-                document.getElementById('individualMessageForm').style.display = 'none';  
-                target.classList.add('btn-primary');  
-                document.getElementById('individualMessageBtn').classList.remove('btn-primary');  
-                return;  
-            }  
-              
-            // Send Broadcast button  
-            if (target.id === 'sendBroadcastBtn' || target.closest('#sendBroadcastBtn')) {  
-                await sendBroadcast();  
-                return;  
-            }  
-              
-            // Preview Broadcast button  
-            if (target.id === 'previewBroadcastBtn') {  
-                previewBroadcast();  
-                return;  
-            }  
-              
-            // Confirm Broadcast button (in modal)  
-            if (target.id === 'confirmBroadcastBtn') {  
-                await executeBroadcast();  
-                return;  
-            }  
-              
-            // Cancel Broadcast button (in modal)  
-            if (target.id === 'cancelBroadcastBtn') {  
-                closeModal();  
-                return;  
-            }  
+                  
+                // Close modal button  
+                if (target.id === 'closeModalBtn' || target.closest('#closeModalBtn') || target.classList.contains('modal-backdrop')) {  
+                    closeModal();  
+                    return;  
+                }  
+                  
+                // Adjust Wallet button  
+                if (target.classList.contains('adjust-wallet-btn')) {  
+                    const userId = target.getAttribute('data-user-id');  
+                    const userName = target.getAttribute('data-user-name');  
+                    const wallet = target.getAttribute('data-wallet');  
+                    showAdjustWallet(userId, userName, parseFloat(wallet || 0));  
+                    return;  
+                }  
+                  
+                // Apply Adjustment button (inside modal)  
+                if (target.classList.contains('apply-adjustment-btn')) {  
+                    const userId = target.getAttribute('data-user-id');  
+                    await adjustWallet(userId);  
+                    return;  
+                }  
+                  
+                // Toggle User Status  
+                if (target.classList.contains('toggle-status-btn')) {  
+                    const userId = target.getAttribute('data-user-id');  
+                    const newStatus = target.getAttribute('data-new-status') === 'true';  
+                    await toggleUserStatus(userId, newStatus);  
+                    return;  
+                }  
+                  
+                // Make Admin  
+                if (target.classList.contains('make-admin-btn')) {  
+                    const userId = target.getAttribute('data-user-id');  
+                    await makeAdmin(userId);  
+                    return;  
+                }  
+                  
+                // Create Task button  
+                if (target.id === 'createTaskBtn') {  
+                    showCreateTask();  
+                    return;  
+                }  
+                  
+                // Create Task Confirm button  
+                if (target.id === 'createTaskConfirmBtn') {  
+                    await createTask();  
+                    return;  
+                }  
+                  
+                // Edit Task button  
+                if (target.classList.contains('edit-task-btn')) {  
+                    const taskId = target.getAttribute('data-task-id');  
+                    await editTask(taskId);  
+                    return;  
+                }  
+                  
+                // Update Task button  
+                if (target.id === 'updateTaskBtn') {  
+                    const taskId = target.getAttribute('data-task-id');  
+                    await updateTask(taskId);  
+                    return;  
+                }  
+                  
+                // Toggle Task button  
+                if (target.classList.contains('toggle-task-btn')) {  
+                    const taskId = target.getAttribute('data-task-id');  
+                    const newStatus = target.getAttribute('data-new-status') === 'true';  
+                    await toggleTask(taskId, newStatus);  
+                    return;  
+                }  
+                  
+                // View Requirements button  
+                if (target.classList.contains('view-requirements-btn')) {  
+                    const taskId = target.getAttribute('data-task-id');  
+                    await viewRequirements(taskId);  
+                    return;  
+                }  
+                  
+                // Approve Submission  
+                if (target.classList.contains('approve-submission')) {  
+                    const subId = target.getAttribute('data-sub-id');  
+                    await reviewSubmission(subId, true);  
+                    return;  
+                }  
+                  
+                // Reject Submission  
+                if (target.classList.contains('reject-submission')) {  
+                    const subId = target.getAttribute('data-sub-id');  
+                    await reviewSubmission(subId, false);  
+                    return;  
+                }  
+                  
+                // Process Withdrawal  
+                if (target.classList.contains('process-withdrawal')) {  
+                    const withdrawalId = target.getAttribute('data-withdrawal-id');  
+                    await processWithdrawal(withdrawalId);  
+                    return;  
+                }  
+                  
+                // Approve Membership  
+                if (target.classList.contains('approve-membership')) {  
+                    const userId = target.getAttribute('data-user-id');  
+                    const paymentId = target.getAttribute('data-payment-id');  
+                    await approveMembership(userId, paymentId);  
+                    return;  
+                }  
+                  
+                // Reject Membership  
+                if (target.classList.contains('reject-membership')) {  
+                    const userId = target.getAttribute('data-user-id');  
+                    const paymentId = target.getAttribute('data-payment-id');  
+                    await rejectMembership(userId, paymentId);  
+                    return;  
+                }  
+                
+                // Edit Packages button
+                if (target.classList.contains('edit-packages-btn') || target.id === 'editPackagesBtn' || 
+                    (target.closest('button') && target.closest('button').textContent.includes('Edit Packages'))) {
+                    showEditPackages();
+                    return;
+                }
+                
+                // Save Packages button
+                if (target.id === 'savePackagesBtn' || (target.closest('button') && target.closest('button').id === 'savePackagesBtn')) {
+                    e.preventDefault();
+                    await savePackages();
+                    return;
+                }
+                
+                // Edit Fee Settings button
+                if (target.id === 'editFeeSettingsBtn' || (target.closest('button') && target.closest('button').textContent.includes('Edit Fee Settings'))) {
+                    showEditFeeSettings();
+                    return;
+                }
+                
+                // Save Fee Settings button
+                if (target.id === 'saveFeeSettingsBtn' || (target.closest('button') && target.closest('button').id === 'saveFeeSettingsBtn')) {
+                    e.preventDefault();
+                    await saveFeeSettings();
+                    return;
+                }
+                  
+                // Credit Referral button  
+                if (target.classList.contains('credit-referral-btn')) {  
+                    const referralId = target.getAttribute('data-referral-id');  
+                    const referrerId = target.getAttribute('data-referrer-id');  
+                    const referredId = target.getAttribute('data-referred-id');  
+                    const referredEmail = target.getAttribute('data-referred-email');  
+                    await creditReferralBonus(referralId, referrerId, referredId, referredEmail);  
+                    return;  
+                }  
+                  
+                // Confirm Credit button (in modal)  
+                if (target.id === 'confirmCreditBtn') {  
+                    const referralId = target.getAttribute('data-referral-id');  
+                    const referrerId = target.getAttribute('data-referrer-id');  
+                    const referredId = target.getAttribute('data-referred-id');  
+                    const referredEmail = target.getAttribute('data-referred-email');  
+                    await executeCreditBonus(referralId, referrerId, referredId, referredEmail);  
+                    return;  
+                }  
+                  
+                // Reject Referral button  
+                if (target.classList.contains('reject-referral-btn')) {  
+                    const referralId = target.getAttribute('data-referral-id');  
+                    if (confirm('Are you sure you want to reject this referral?')) {  
+                        await rejectReferral(referralId);  
+                    }  
+                    return;  
+                }  
+                  
+                // Send Individual Message  
+                if (target.id === 'sendMessageBtn') {  
+                    await sendMessage();  
+                    return;  
+                }  
+                  
+                // Individual Message button  
+                if (target.id === 'individualMessageBtn') {  
+                    currentMessageType = 'individual';  
+                    document.getElementById('individualMessageForm').style.display = 'block';  
+                    document.getElementById('broadcastMessageForm').style.display = 'none';  
+                    target.classList.add('btn-primary');  
+                    document.getElementById('broadcastMessageBtn').classList.remove('btn-primary');  
+                    return;  
+                }  
+                  
+                // Broadcast Message button  
+                if (target.id === 'broadcastMessageBtn') {  
+                    currentMessageType = 'broadcast';  
+                    document.getElementById('broadcastMessageForm').style.display = 'block';  
+                    document.getElementById('individualMessageForm').style.display = 'none';  
+                    target.classList.add('btn-primary');  
+                    document.getElementById('individualMessageBtn').classList.remove('btn-primary');  
+                    return;  
+                }  
+                  
+                // Send Broadcast button  
+                if (target.id === 'sendBroadcastBtn' || target.closest('#sendBroadcastBtn')) {  
+                    await sendBroadcast();  
+                    return;  
+                }  
+                  
+                // Preview Broadcast button  
+                if (target.id === 'previewBroadcastBtn') {  
+                    previewBroadcast();  
+                    return;  
+                }  
+                  
+                // Confirm Broadcast button (in modal)  
+                if (target.id === 'confirmBroadcastBtn') {  
+                    await executeBroadcast();  
+                    return;  
+                }  
+                  
+                // Cancel Broadcast button (in modal)  
+                if (target.id === 'cancelBroadcastBtn') {  
+                    closeModal();  
+                    return;  
+                }  
 
-            // NEW: Toggle Individual Notification Form  
-            if (target.id === 'individualNotificationBtn') {  
-                const form = document.getElementById('individualNotificationForm');  
-                form.style.display = form.style.display === 'none' ? 'block' : 'none';  
-                document.getElementById('broadcastNotificationForm').style.display = 'none';  
-                return;  
-            }  
+                // Toggle Individual Notification Form  
+                if (target.id === 'individualNotificationBtn') {  
+                    const form = document.getElementById('individualNotificationForm');  
+                    form.style.display = form.style.display === 'none' ? 'block' : 'none';  
+                    document.getElementById('broadcastNotificationForm').style.display = 'none';  
+                    return;  
+                }  
 
-            // NEW: Toggle Broadcast Notification Form  
-            if (target.id === 'broadcastNotificationBtn') {  
-                const form = document.getElementById('broadcastNotificationForm');  
-                form.style.display = form.style.display === 'none' ? 'block' : 'none';  
-                document.getElementById('individualNotificationForm').style.display = 'none';  
-                return;  
-            }  
+                // Toggle Broadcast Notification Form  
+                if (target.id === 'broadcastNotificationBtn') {  
+                    const form = document.getElementById('broadcastNotificationForm');  
+                    form.style.display = form.style.display === 'none' ? 'block' : 'none';  
+                    document.getElementById('individualNotificationForm').style.display = 'none';  
+                    return;  
+                }  
 
-            // NEW: Send Individual Notification  
-            if (target.id === 'sendIndividualNotifBtn') {  
-                await sendIndividualNotification();  
-                return;  
-            }  
+                // Send Individual Notification  
+                if (target.id === 'sendIndividualNotifBtn') {  
+                    await sendIndividualNotification();  
+                    return;  
+                }  
 
-            // NEW: Send Broadcast Notification (opens confirmation modal)  
-            if (target.id === 'sendBroadcastNotifBtn') {  
-                await sendBroadcastNotification();  
-                return;  
-            }  
+                // Send Broadcast Notification (opens confirmation modal)  
+                if (target.id === 'sendBroadcastNotifBtn') {  
+                    await sendBroadcastNotification();  
+                    return;  
+                }  
 
-            // NEW: Confirm Broadcast Notification  
-            if (target.id === 'confirmBroadcastNotifBtn') {  
-                await executeBroadcastNotification();  
-                return;  
-            }  
+                // Confirm Broadcast Notification  
+                if (target.id === 'confirmBroadcastNotifBtn') {  
+                    await executeBroadcastNotification();  
+                    return;  
+                }  
+            } catch (error) {
+                console.error('Error in click handler:', error);
+                showAlert('An error occurred: ' + error.message, 'error');
+            }
         });  
           
         // Make functions globally available  
@@ -4099,7 +4105,6 @@
         window.sendBroadcast = sendBroadcast;  
         window.executeBroadcast = executeBroadcast;  
         window.previewBroadcast = previewBroadcast;  
-        // NEW functions  
         window.sendNotification = sendNotification;  
         window.sendNotificationToAll = sendNotificationToAll;  
         window.sendIndividualNotification = sendIndividualNotification;  
