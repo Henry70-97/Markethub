@@ -13,7 +13,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* (All previous styles remain exactly the same) */
+        /* All existing styles remain exactly the same – included for completeness */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; }
         .app-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
@@ -4409,41 +4409,50 @@
         };
 
         async function loadTrainings() {
-            const snapshot = await db.collection('trainings').orderBy('createdAt', 'desc').get();
-            let html = `
-                <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;">
-                    <h4>All Trainings</h4>
-                    <button class="btn btn-success" onclick="showCreateTraining()">+ New Training</button>
-                </div>
-            `;
-            if (snapshot.empty) {
-                html += '<p>No trainings created yet.</p>';
-            } else {
-                html += '<div class="packages-grid">';
-                snapshot.forEach(doc => {
-                    const t = doc.data();
-                    const typeBadge = t.type === 'free' ? 
-                        '<span class="badge success">Free</span>' : 
-                        `<span class="badge warning">Prepaid $${t.price}</span>`;
-                    html += `
-                        <div class="package-card" style="border-color: #6366f1;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-                                <h4 style="margin:0;">${t.title}</h4>
-                                ${typeBadge}
+            const trainingContent = document.getElementById('trainingContent');
+            if (!trainingContent) return;
+            trainingContent.innerHTML = '<p style="text-align:center;">Loading trainings...</p>';
+            
+            try {
+                const snapshot = await db.collection('trainings').orderBy('createdAt', 'desc').get();
+                let html = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;">
+                        <h4>All Trainings</h4>
+                        <button class="btn btn-success" onclick="showCreateTraining()">+ New Training</button>
+                    </div>
+                `;
+                if (snapshot.empty) {
+                    html += '<p>No trainings created yet. Click the button above to create one.</p>';
+                } else {
+                    html += '<div class="packages-grid">';
+                    snapshot.forEach(doc => {
+                        const t = doc.data();
+                        const typeBadge = t.type === 'free' ? 
+                            '<span class="badge success">Free</span>' : 
+                            `<span class="badge warning">Prepaid $${t.price}</span>`;
+                        html += `
+                            <div class="package-card" style="border-color: #6366f1;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                                    <h4 style="margin:0;">${t.title}</h4>
+                                    ${typeBadge}
+                                </div>
+                                <p><strong>Duration:</strong> ${t.duration || 'N/A'}</p>
+                                <p><strong>Requirements:</strong> ${t.requirements || 'None'}</p>
+                                <p><strong>Resources:</strong> ${t.resources ? t.resources.length : 0} items</p>
+                                <div style="margin-top:1rem;">
+                                    <button class="btn btn-sm btn-primary" onclick="editTraining('${doc.id}')">Edit</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTraining('${doc.id}')">Delete</button>
+                                </div>
                             </div>
-                            <p><strong>Duration:</strong> ${t.duration || 'N/A'}</p>
-                            <p><strong>Requirements:</strong> ${t.requirements || 'None'}</p>
-                            <p><strong>Resources:</strong> ${t.resources ? t.resources.length : 0} items</p>
-                            <div style="margin-top:1rem;">
-                                <button class="btn btn-sm btn-primary" onclick="editTraining('${doc.id}')">Edit</button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteTraining('${doc.id}')">Delete</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += '</div>';
+                        `;
+                    });
+                    html += '</div>';
+                }
+                trainingContent.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading trainings:', error);
+                trainingContent.innerHTML = `<p style="color:red;">Error loading trainings: ${error.message}</p>`;
             }
-            document.getElementById('trainingContent').innerHTML = html;
         }
 
         window.showCreateTraining = function() {
@@ -4655,42 +4664,51 @@
         };
 
         async function loadTrainingApplications() {
-            const snapshot = await db.collection('trainingApplications')
-                .orderBy('appliedAt', 'desc')
-                .get();
-            let html = '<h4>Training Applications</h4>';
-            if (snapshot.empty) {
-                html += '<p>No applications yet.</p>';
-            } else {
-                html += '<table class="data-table"><tr><th>User</th><th>Training</th><th>Type</th><th>Status</th><th>Applied</th><th>Actions</th></tr>';
-                for (const doc of snapshot.docs) {
-                    const app = doc.data();
-                    const trainingDoc = await db.collection('trainings').doc(app.trainingId).get();
-                    const trainingTitle = trainingDoc.exists ? trainingDoc.data().title : 'Unknown';
-                    const typeBadge = app.type === 'free' ? 
-                        '<span class="badge success">Free</span>' : 
-                        '<span class="badge warning">Prepaid</span>';
-                    const statusClass = app.status === 'pending' ? 'warning' : (app.status === 'approved' ? 'success' : 'danger');
-                    html += `
-                        <tr>
-                            <td>${app.userEmail}</td>
-                            <td>${trainingTitle}</td>
-                            <td>${typeBadge}</td>
-                            <td><span class="badge ${statusClass}">${app.status}</span></td>
-                            <td>${app.appliedAt ? formatDate(app.appliedAt) : 'N/A'}</td>
-                            <td>
-                                ${app.status === 'pending' ? `
-                                    <button class="btn btn-sm btn-success" onclick="approveTrainingApplication('${doc.id}', '${app.userId}')">Approve</button>
-                                    <button class="btn btn-sm btn-danger" onclick="rejectTrainingApplication('${doc.id}')">Reject</button>
-                                ` : ''}
-                                ${app.paymentDetails ? `<small>${app.paymentDetails}</small>` : ''}
-                            </td>
-                        </tr>
-                    `;
+            const trainingContent = document.getElementById('trainingContent');
+            if (!trainingContent) return;
+            trainingContent.innerHTML = '<p style="text-align:center;">Loading applications...</p>';
+            
+            try {
+                const snapshot = await db.collection('trainingApplications')
+                    .orderBy('appliedAt', 'desc')
+                    .get();
+                let html = '<h4>Training Applications</h4>';
+                if (snapshot.empty) {
+                    html += '<p>No applications yet.</p>';
+                } else {
+                    html += '<table class="data-table"><tr><th>User</th><th>Training</th><th>Type</th><th>Status</th><th>Applied</th><th>Actions</th></tr>';
+                    for (const doc of snapshot.docs) {
+                        const app = doc.data();
+                        const trainingDoc = await db.collection('trainings').doc(app.trainingId).get();
+                        const trainingTitle = trainingDoc.exists ? trainingDoc.data().title : 'Unknown';
+                        const typeBadge = app.type === 'free' ? 
+                            '<span class="badge success">Free</span>' : 
+                            '<span class="badge warning">Prepaid</span>';
+                        const statusClass = app.status === 'pending' ? 'warning' : (app.status === 'approved' ? 'success' : 'danger');
+                        html += `
+                            <tr>
+                                <td>${app.userEmail}</td>
+                                <td>${trainingTitle}</td>
+                                <td>${typeBadge}</td>
+                                <td><span class="badge ${statusClass}">${app.status}</span></td>
+                                <td>${app.appliedAt ? formatDate(app.appliedAt) : 'N/A'}</td>
+                                <td>
+                                    ${app.status === 'pending' ? `
+                                        <button class="btn btn-sm btn-success" onclick="approveTrainingApplication('${doc.id}', '${app.userId}')">Approve</button>
+                                        <button class="btn btn-sm btn-danger" onclick="rejectTrainingApplication('${doc.id}')">Reject</button>
+                                    ` : ''}
+                                    ${app.paymentDetails ? `<small>${app.paymentDetails}</small>` : ''}
+                                </td>
+                            </tr>
+                        `;
+                    }
+                    html += '</table>';
                 }
-                html += '</table>';
+                trainingContent.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading applications:', error);
+                trainingContent.innerHTML = `<p style="color:red;">Error loading applications: ${error.message}</p>`;
             }
-            document.getElementById('trainingContent').innerHTML = html;
         }
 
         window.approveTrainingApplication = async function(appId, userId) {
