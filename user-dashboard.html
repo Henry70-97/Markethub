@@ -932,6 +932,92 @@
             .messages-header { flex-direction: column; align-items: stretch; }
             .btn { width: 100%; }
         }
+
+        /* -------------------- WITHDRAWAL STYLISH CSS -------------------- */
+        .withdrawal-section {
+            background: linear-gradient(145deg, #ffffff, #f8fafc);
+            border-radius: 2rem;
+            padding: 2.5rem;
+            margin-top: 2rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+        }
+        .withdrawal-section h4 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .withdrawal-section h4 i {
+            color: #6366f1;
+            font-size: 2rem;
+        }
+        .balance-highlight {
+            font-size: 2.4rem;
+            font-weight: 800;
+            color: #10b981;
+            background: #10b98110;
+            padding: 0.5rem 1.5rem;
+            border-radius: 60px;
+            display: inline-block;
+        }
+        .withdrawal-section .input-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        .withdrawal-section label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .withdrawal-section .input-icon {
+            position: absolute;
+            left: 1.2rem;
+            top: 2.7rem;
+            color: #94a3b8;
+            font-size: 1.2rem;
+        }
+        .withdrawal-section input, .withdrawal-section select {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 60px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: white;
+        }
+        .withdrawal-section input:focus, .withdrawal-section select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+        }
+        .withdrawal-section .fee-breakdown {
+            background: #f1f5f9;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid #6366f1;
+        }
+        .withdrawal-section .withdrawal-warning {
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+        .withdrawal-section .btn {
+            width: 100%;
+            padding: 1.2rem;
+            font-size: 1.2rem;
+            border-radius: 60px;
+            margin-top: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -1063,6 +1149,7 @@
 
         // -------------------- CONSTANTS --------------------
         let TRANSACTION_FEE_PERCENT = 3, PLATFORM_FEE_PERCENT = 2, TOTAL_FEE_PERCENT = 5;
+        let MIN_WITHDRAWAL = 5; // default, will be updated from Firestore
         const MEMBERSHIP_TYPES = { BASIC: 'basic', PREMIUM: 'premium', ELITE: 'elite' };
         const DEFAULT_MEMBERSHIP_PACKAGES = {
             basic: { name: 'BASIC', price: 0, duration: 'lifetime', features: [], color: '#94a3b8', buttonClass: 'basic', badge: null },
@@ -1101,6 +1188,18 @@
             } catch (e) {
                 console.error('Error fetching admin ID:', e);
                 return null;
+            }
+        }
+
+        // -------------------- LOAD WITHDRAWAL SETTINGS --------------------
+        async function loadWithdrawalSettings() {
+            try {
+                const doc = await db.collection('settings').doc('withdrawal').get();
+                if (doc.exists) {
+                    MIN_WITHDRAWAL = doc.data().minAmount || 5;
+                }
+            } catch (e) {
+                console.error('Error loading withdrawal settings:', e);
             }
         }
 
@@ -1417,7 +1516,9 @@
                 currentUser = user;
                 document.getElementById('userName').textContent = userData.displayName;
                 document.getElementById('walletDisplay').textContent = `$${(userData.wallet || 0).toFixed(2)}`;
-                await loadFeeSettings(); await loadMembershipPackages();
+                await loadFeeSettings(); 
+                await loadMembershipPackages();
+                await loadWithdrawalSettings(); // load min withdrawal amount
                 setupMessageCounter(); setupWalletListener(); setupNotificationsListener();
                 loadDashboard();
                 refreshMirror();
@@ -1768,7 +1869,7 @@
                     wordCount: wc,
                     submittedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                await db.collection('tasks').doc(taskId).update({ submissionsCount: firebase.firestore.FieldValue.increment(1) });
+                // Do NOT update task submissionsCount due to permissions; rely on Cloud Function
                 sessionStorage.removeItem('pendingSubmission');
                 showModal(`
                     <div class="modal-content" style="text-align:center;">
@@ -1780,7 +1881,10 @@
                     </div>
                 `);
                 refreshMirror();
-            } catch (e) { showAlert('Error saving submission','error'); }
+            } catch (e) { 
+                console.error('Error saving submission:', e);
+                showAlert('Error saving submission. Please try again.', 'error'); 
+            }
         }
 
         // -------------------- SUBMISSIONS --------------------
@@ -1817,7 +1921,7 @@
             } catch (e) { document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadSubmissions()">Retry</button></div>`; }
         }
 
-        // -------------------- WITHDRAWALS --------------------
+        // -------------------- WITHDRAWALS (with bank option and stylish CSS) --------------------
         async function loadWithdrawals() {
             currentTaskViewed = null; refreshMirror();
             try {
@@ -1829,13 +1933,32 @@
                 const canWithdraw = userData.membershipType === MEMBERSHIP_TYPES.PREMIUM || userData.membershipType === MEMBERSHIP_TYPES.ELITE;
                 let ws = canWithdraw ? `
                     <div class="withdrawal-section">
-                        <h4>Withdraw Funds</h4>
-                        <div style="display:flex; justify-content:space-between;"><span>Available Balance:</span><span class="balance-highlight">$${bal.toFixed(2)}</span></div>
-                        <input type="number" id="withdrawAmount" placeholder="Amount (USD)" min="5" max="${bal}" step="0.01" oninput="updateFeeBreakdown(${bal})">
+                        <h4><i class="fas fa-money-bill-wave"></i> Withdraw Funds</h4>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem;">
+                            <span style="font-size:1.2rem; font-weight:600;">Available Balance:</span>
+                            <span class="balance-highlight">$${bal.toFixed(2)}</span>
+                        </div>
+                        <div class="input-group">
+                            <label for="withdrawAmount">Amount (USD) - Minimum $${MIN_WITHDRAWAL}</label>
+                            <i class="fas fa-dollar-sign input-icon"></i>
+                            <input type="number" id="withdrawAmount" placeholder="0.00" min="${MIN_WITHDRAWAL}" max="${bal}" step="0.01" oninput="updateFeeBreakdown(${bal})">
+                        </div>
                         <div id="feeBreakdown" class="fee-breakdown" style="display:none;"></div>
-                        <div class="withdrawal-warning" id="withdrawWarning">Amount exceeds balance!</div>
-                        <select id="withdrawMethod"><option value="M-Pesa">M-Pesa</option><option value="Airtel Money">Airtel Money</option></select>
-                        <input type="tel" id="withdrawPhone" placeholder="Phone Number">
+                        <div class="withdrawal-warning" id="withdrawWarning">Amount exceeds available balance!</div>
+                        <div class="input-group">
+                            <label for="withdrawMethod">Withdrawal Method</label>
+                            <i class="fas fa-credit-card input-icon"></i>
+                            <select id="withdrawMethod">
+                                <option value="M-Pesa">M-Pesa</option>
+                                <option value="Airtel Money">Airtel Money</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="withdrawPhone">Account / Phone Number</label>
+                            <i class="fas fa-phone-alt input-icon"></i>
+                            <input type="tel" id="withdrawPhone" placeholder="Enter your account number or phone">
+                        </div>
                         <button class="btn btn-primary" onclick="requestWithdrawal()">Request Withdrawal</button>
                     </div>
                 ` : `<div class="withdrawal-section"><p>You need a premium membership to withdraw.</p><button class="btn btn-primary" onclick="simulateWithdrawalAttempt()">Initiate Withdrawal</button></div>`;
@@ -1849,7 +1972,7 @@
                     wds.forEach(w => {
                         const date = w.requestedAt?.seconds ? new Date(w.requestedAt.seconds*1000).toLocaleDateString() : 'N/A';
                         const sc = w.status === 'paid' ? 'success' : w.status === 'rejected' ? 'danger' : 'warning';
-                        hist += `<div class="submission-card"><div style="display:flex; justify-content:space-between;"><strong>$${w.amount}</strong><span class="badge ${sc}">${w.status}</span></div><p style="font-size:0.8rem;">${w.phone||'No phone'} • ${date}</p></div>`;
+                        hist += `<div class="submission-card"><div style="display:flex; justify-content:space-between;"><strong>$${w.amount}</strong><span class="badge ${sc}">${w.status}</span></div><p style="font-size:0.8rem;">${w.phone||'No account'} • ${date}</p></div>`;
                     });
                     hist += '</div>';
                 }
@@ -1876,7 +1999,7 @@
             const amt = parseFloat(document.getElementById('withdrawAmount').value);
             const method = document.getElementById('withdrawMethod').value;
             const phone = document.getElementById('withdrawPhone').value;
-            if (!amt || amt < 5) { showAlert('Minimum $5','error'); return; }
+            if (!amt || amt < MIN_WITHDRAWAL) { showAlert(`Minimum withdrawal is $${MIN_WITHDRAWAL}`,'error'); return; }
             try {
                 const userDoc = await db.collection('users').doc(currentUser.uid).get();
                 const bal = userDoc.data().wallet || 0;
@@ -1895,8 +2018,9 @@
             } catch (e) { showAlert('Error requesting withdrawal','error'); }
         }
 
-        // -------------------- MEMBERSHIP OPTIONS (with real Firestore save) --------------------
+        // -------------------- MEMBERSHIP OPTIONS (only premium, price from Firestore) --------------------
         function showMembershipOptions() {
+            const premiumPkg = (membershipPackages && membershipPackages.premium) || DEFAULT_MEMBERSHIP_PACKAGES.premium;
             showModal(`
                 <div class="modal-content" style="text-align:center;">
                     <div style="margin-bottom:1.5rem; background:linear-gradient(135deg,#667eea,#764ba2); padding:1.5rem; border-radius:1rem; color:white;">
@@ -1906,9 +2030,12 @@
                     </div>
                     <i class="fas fa-crown" style="font-size:4rem; color:#f59e0b;"></i>
                     <h3>Upgrade Your Membership</h3>
-                    <div style="display:flex; flex-direction:column; gap:1rem;">
-                        <div style="background:#f8fafc; padding:1.5rem; border:2px solid #6366f1;"><h4 style="color:#6366f1;">Premium</h4><p style="font-size:1.5rem;">$3/year</p></div>
-                        <div style="background:#f8fafc; padding:1.5rem; border:2px solid #f59e0b;"><h4 style="color:#f59e0b;">Elite</h4><p style="font-size:1.5rem;">$6/year</p></div>
+                    <div style="display:flex; flex-direction:column; gap:1rem; max-width:400px; margin:0 auto;">
+                        <div style="background:#f8fafc; padding:2rem; border:2px solid #6366f1; border-radius:1.5rem;">
+                            <h4 style="color:#6366f1; font-size:1.8rem;">${escapeHtml(premiumPkg.name)}</h4>
+                            <p style="font-size:2rem; font-weight:800; color:#0f172a;">$${premiumPkg.price}<span style="font-size:1rem; color:#64748b;">/${premiumPkg.duration}</span></p>
+                            <p style="color:#475569;">✓ Access to all tasks<br>✓ Withdrawals enabled<br>✓ Priority support</p>
+                        </div>
                     </div>
                     <div style="margin-top:2rem; padding:1.5rem; background:#f1f5f9;">
                         <h4>Payment Verification</h4>
@@ -1924,7 +2051,6 @@
             if (!msg) { showAlert('Please enter payment confirmation','error'); return; }
             try {
                 showModal(`<div class="modal-content"><div class="loading-spinner"></div><h3>Submitting...</h3></div>`);
-                // Save to membershipPayments collection
                 await db.collection('membershipPayments').add({
                     userId: currentUser.uid,
                     userEmail: currentUser.email,
@@ -1932,7 +2058,6 @@
                     status: 'pending',
                     submittedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                // Optionally create a notification for admin? Not needed, admin can query.
                 showModal(`
                     <div class="modal-content" style="text-align:center;">
                         <div class="success-check"><i class="fas fa-check"></i></div>
@@ -1947,7 +2072,7 @@
             }
         }
 
-        // -------------------- MESSAGES (fixed thread display) --------------------
+        // -------------------- MESSAGES (fixed with custom ID for parentMessageId) --------------------
         async function loadMessages() {
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading messages...</p></div>';
@@ -2028,20 +2153,25 @@
             const admin = await getAdminId();
             if (!admin) { showAlert('Cannot send message: admin not found','error'); return; }
             try {
-                const ref = await db.collection('messages').add({
+                // Generate a custom ID to use as parentMessageId
+                const threadId = db.collection('messages').doc().id;
+                await db.collection('messages').doc(threadId).set({
                     senderId: currentUser.uid,
                     recipientId: admin,
                     fromAdmin: false,
                     subject: subj,
                     message: msg,
+                    parentMessageId: threadId,
                     read: false,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                await db.collection('messages').doc(ref.id).update({ parentMessageId: ref.id });
                 closeModal();
                 showAlert('Message sent!','success');
                 loadMessages();
-            } catch (e) { showAlert('Error sending message','error'); }
+            } catch (e) { 
+                console.error('Error sending message:', e);
+                showAlert('Error sending message','error'); 
+            }
         }
 
         async function viewMessageThread(threadId) {
@@ -2104,7 +2234,10 @@
                 closeModal();
                 viewMessageThread(threadId);
                 showAlert('Reply sent!','success');
-            } catch (e) { showAlert('Error sending reply','error'); }
+            } catch (e) { 
+                console.error('Error sending reply:', e);
+                showAlert('Error sending reply','error'); 
+            }
         }
 
         // -------------------- NOTIFICATIONS --------------------
