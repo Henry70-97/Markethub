@@ -4212,7 +4212,7 @@
             }
         };
 
-        // Generate leaderboard from user data
+        // Generate leaderboard from user data (UPDATED to handle missing fields)
         window.generateLeaderboardFromUsers = async function() {
             if (!confirm('This will replace all auto-generated entries. Manual entries will be preserved and re-ranked. Continue?')) return;
 
@@ -4225,7 +4225,7 @@
                     const data = doc.data();
                     users.push({
                         id: doc.id,
-                        name: data.displayName || data.email,
+                        name: data.displayName || data.email || 'Unknown User',
                         wallet: data.wallet || 0,
                         tasksCompleted: data.tasksCompleted || 0
                     });
@@ -4236,7 +4236,7 @@
                     userId: u.id,
                     userName: u.name,
                     points: (u.wallet * 10) + (u.tasksCompleted * 5),
-                    type: 'auto'   // will be overwritten if manual exists
+                    type: 'auto'
                 }));
 
                 // 3. Fetch existing leaderboard entries
@@ -4245,7 +4245,14 @@
                 existingSnap.forEach(doc => {
                     const data = doc.data();
                     if (data.type === 'manual') {
-                        manualEntries.push({ id: doc.id, ...data });
+                        // Ensure manual entry has required fields
+                        manualEntries.push({ 
+                            id: doc.id, 
+                            userId: data.userId || null,
+                            userName: data.userName || 'Anonymous',
+                            points: data.points || 0,
+                            type: 'manual'
+                        });
                     }
                 });
 
@@ -4253,16 +4260,12 @@
                 const combinedMap = new Map();
                 // Add auto entries
                 userScores.forEach(u => {
-                    combinedMap.set(u.userId, { ...u, type: 'auto' });
+                    combinedMap.set(u.userId, { ...u });
                 });
                 // Override with manual entries (if they have the same userId)
                 manualEntries.forEach(m => {
-                    if (m.userId) {
-                        combinedMap.set(m.userId, { ...m, type: 'manual' }); // use manual data
-                    } else {
-                        // manual entry without userId (legacy) – keep as is
-                        combinedMap.set(m.id, { ...m, type: 'manual' }); // use id as key
-                    }
+                    const key = m.userId || m.id; // if no userId, use doc id as key
+                    combinedMap.set(key, { ...m, type: 'manual' });
                 });
 
                 // Convert map to array
@@ -4271,8 +4274,15 @@
                 // 5. Sort by points descending
                 combined.sort((a, b) => b.points - a.points);
 
-                // 6. Assign ranks
-                combined = combined.map((entry, index) => ({ ...entry, rank: index + 1 }));
+                // 6. Assign ranks and sanitize each entry
+                combined = combined.map((entry, index) => ({
+                    userId: entry.userId || null,
+                    userName: entry.userName || 'Anonymous',
+                    points: entry.points || 0,
+                    rank: index + 1,
+                    type: entry.type || 'auto',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }));
 
                 // 7. Replace the leaderboard collection in batches
                 const batch = db.batch();
@@ -4283,14 +4293,7 @@
                 // Add new combined entries
                 combined.forEach(entry => {
                     const newRef = db.collection('leaderboard').doc(); // new auto-id
-                    batch.set(newRef, {
-                        userId: entry.userId || null,
-                        userName: entry.userName,
-                        points: entry.points,
-                        rank: entry.rank,
-                        type: entry.type,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    batch.set(newRef, entry);
                 });
                 await batch.commit();
 
