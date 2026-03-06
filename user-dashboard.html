@@ -344,6 +344,58 @@
         .resource-item { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
         .resource-item a { color: #6366f1; text-decoration: none; }
         .resource-item a:hover { text-decoration: underline; }
+
+        /* ========== ADD ALTERNATING COLORS FOR CARDS ========== */
+        .stats-grid .stat-card:nth-child(odd),
+        .training-grid .training-card:nth-child(odd),
+        .submission-card:nth-child(odd),
+        .message-thread-card:nth-child(odd),
+        .faq-item:nth-child(odd),
+        .feedback-card:nth-child(odd) {
+            background-color: #f8fafc;
+        }
+
+        .stats-grid .stat-card:nth-child(even),
+        .training-grid .training-card:nth-child(even),
+        .submission-card:nth-child(even),
+        .message-thread-card:nth-child(even),
+        .faq-item:nth-child(even),
+        .feedback-card:nth-child(even) {
+            background-color: #eef2ff;
+        }
+
+        /* Ensure hover effects work with alternating colors */
+        .stats-grid .stat-card:hover,
+        .training-grid .training-card:hover,
+        .submission-card:hover,
+        .message-thread-card:hover,
+        .faq-item:hover,
+        .feedback-card:hover {
+            filter: brightness(0.98);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Keep special cards unchanged */
+        .withdrawal-section,
+        .petition-section,
+        .referral-card {
+            background: inherit;
+        }
+
+        /* Ensure that the existing background of .submission-card is overridden */
+        .submission-card {
+            background: transparent; /* let the nth-child handle it */
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Keep unread message card distinct */
+        .message-thread-card.unread {
+            background: #6366f108 !important;
+            border-left: 4px solid #6366f1;
+        }
     </style>
 </head>
 <body>
