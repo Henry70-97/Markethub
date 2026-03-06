@@ -347,7 +347,7 @@
     </style>
 </head>
 <body>
-    <!-- Mobile Navigation (unchanged) -->
+    <!-- Mobile Navigation -->
     <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()"></div>
     <div class="mobile-nav" id="mobileNav">
         <div class="mobile-nav-header">
@@ -369,7 +369,6 @@
             <i class="fas fa-bell"></i><span>Notifications</span>
             <span id="mobileNotifBadge" style="display:none; background:#ef4444; color:white; border-radius:40px; padding:0.2rem 0.5rem; font-size:0.8rem; margin-left:auto;">0</span>
         </div>
-        <!-- NEW TABS -->
         <div class="mobile-nav-item" onclick="handleMobileNavClick('leaderboard')"><i class="fas fa-trophy"></i><span>Leaderboard</span></div>
         <div class="mobile-nav-item" onclick="handleMobileNavClick('faq')"><i class="fas fa-question-circle"></i><span>FAQ</span></div>
         <div class="mobile-nav-item" onclick="handleMobileNavClick('feedback')"><i class="fas fa-star"></i><span>Client Feedback</span></div>
@@ -439,7 +438,6 @@
             <button class="tab" onclick="switchTab('withdrawals')">💰 Withdrawals</button>
             <button class="tab" onclick="switchTab('messages')">💬 Messages<span id="unreadMessagesBadge" style="display:none; background:#ef4444; color:white; border-radius:40px; padding:0.2rem 0.5rem; font-size:0.7rem; margin-left:0.3rem;">0</span></button>
             <button class="tab" onclick="switchTab('notifications')">🔔 Notifications<span id="unreadNotifBadge" style="display:none; background:#ef4444; color:white; border-radius:40px; padding:0.2rem 0.5rem; font-size:0.7rem; margin-left:0.3rem;">0</span></button>
-            <!-- NEW TABS -->
             <button class="tab" onclick="switchTab('leaderboard')">🏆 Leaderboard</button>
             <button class="tab" onclick="switchTab('faq')">❓ FAQ</button>
             <button class="tab" onclick="switchTab('feedback')">⭐ Client Feedback</button>
@@ -707,7 +705,6 @@
                 case 'messages': loadMessages(); break;
                 case 'notifications': loadNotificationsPage(); break;
                 case 'profile': loadProfile(); break;
-                // NEW TABS
                 case 'leaderboard': loadLeaderboard(); break;
                 case 'faq': loadFaq(); break;
                 case 'feedback': loadClientFeedback(); break;
@@ -726,7 +723,7 @@
         function formatDeadline(deadline) { if (!deadline) return 'No deadline'; const d = deadline.toDate ? deadline.toDate() : new Date(deadline); const diff = d - new Date(); if (diff < 0) return 'Expired'; const days = Math.ceil(diff / (1000*60*60*24)); if (days > 7) return d.toLocaleDateString(); if (days > 1) return `${days} days left`; if (days === 1) return '1 day left'; return `${Math.ceil(diff / (1000*60*60))} hours left`; }
         function getDeadlineClass(deadline) { if (!deadline) return ''; const d = deadline.toDate ? deadline.toDate() : new Date(deadline); const diff = d - new Date(); if (diff < 0) return 'expired'; if (diff < 24*60*60*1000) return 'urgent'; return 'upcoming'; }
 
-        // -------------------- AUTH STATE (with login logging) --------------------
+        // -------------------- AUTH STATE --------------------
         auth.onAuthStateChanged(async (user) => {
             if (!user) { window.location.href = 'index.html'; return; }
             const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
@@ -797,7 +794,6 @@
                 document.getElementById('userName').textContent = userData.displayName;
                 document.getElementById('walletDisplay').textContent = `$${(userData.wallet || 0).toFixed(2)}`;
 
-                // Record login
                 try {
                     await db.collection('userLogins').add({
                         userId: currentUser.uid,
@@ -842,7 +838,6 @@
                 }
                 userData.activityRate = activityRate;
 
-                // Productivity score: simple formula: (approved * 10) + (wallet * 2) - (rejected * 5)
                 const productivityScore = (approvedSnap.size * 10) + (userData.wallet * 2) - (rejectedSnap.size * 5);
                 userData.productivityScore = Math.max(0, Math.round(productivityScore));
                 
@@ -857,14 +852,13 @@
             } catch (e) { console.error('Dashboard error:', e); switchTab('tasks'); }
         }
 
-        // -------------------- TASKS (OPTIMIZED with batch status loading) --------------------
+        // -------------------- TASKS (NO taskInvites) --------------------
         let allTasks = [], filteredTasks = [], currentFilters = { category:'all', deadline:'all', amount:'all', difficulty:'all', sortBy:'newest' };
 
         async function loadTasks() {
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading tasks...</p></div>';
             try {
-                // Fetch all active tasks
                 const tasksSnap = await db.collection('tasks').where('active', '==', true).get();
                 if (tasksSnap.empty) {
                     document.getElementById('content').innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><h4>No Tasks Available</h4></div>';
@@ -873,25 +867,15 @@
                 const tasks = [];
                 tasksSnap.forEach(doc => tasks.push({ id: doc.id, ...doc.data() }));
 
-                // Batch-load user's acceptances and invites using collectionGroup queries
-                const [acceptsSnap, invitesSnap, submissionsSnap] = await Promise.all([
+                const [acceptsSnap, submissionsSnap] = await Promise.all([
                     db.collectionGroup('taskAccepts').where('userId', '==', currentUser.uid).get(),
-                    db.collectionGroup('taskInvites').where('userId', '==', currentUser.uid).get(),
                     db.collection('submissions').where('userId', '==', currentUser.uid).get()
                 ]);
 
-                // Build maps for quick lookup
                 const acceptedTasks = new Set();
                 acceptsSnap.forEach(doc => {
-                    const taskId = doc.ref.parent.parent?.id; // taskId from path
-                    if (taskId) acceptedTasks.add(taskId);
-                });
-
-                const invitedStatus = new Map(); // taskId -> status
-                invitesSnap.forEach(doc => {
-                    const data = doc.data();
                     const taskId = doc.ref.parent.parent?.id;
-                    if (taskId) invitedStatus.set(taskId, data.status);
+                    if (taskId) acceptedTasks.add(taskId);
                 });
 
                 const submittedTasks = new Set();
@@ -899,19 +883,11 @@
                     submittedTasks.add(doc.data().taskId);
                 });
 
-                // Enrich tasks with user's status
-                allTasks = tasks.map(task => {
-                    const userAccepted = acceptedTasks.has(task.id);
-                    const userInviteStatus = invitedStatus.get(task.id) || null;
-                    const userSubmitted = submittedTasks.has(task.id);
-                    return {
-                        ...task,
-                        userAccepted,
-                        userInviteStatus,
-                        userSubmitted,
-                        team: [] // will be filled if needed
-                    };
-                });
+                allTasks = tasks.map(task => ({
+                    ...task,
+                    userAccepted: acceptedTasks.has(task.id),
+                    userSubmitted: submittedTasks.has(task.id)
+                }));
 
                 filteredTasks = [...allTasks];
                 renderTasks();
@@ -938,16 +914,7 @@
                     } else if (t.acceptedCount >= maxCollab) {
                         acceptButton = `<button class="btn btn-disabled" disabled>Full (${t.acceptedCount}/${maxCollab})</button>`;
                     } else if (t.userAccepted) {
-                        acceptButton = '<button class="btn btn-success" disabled>Accepted</button>';
-                    } else if (t.userInviteStatus === 'pending') {
-                        acceptButton = '<button class="btn btn-warning" disabled>Invite Pending</button>';
-                    } else if (t.userInviteStatus === 'accepted') {
-                        acceptButton = '<button class="btn btn-warning" disabled>Awaiting Approval</button>';
-                    } else if (t.userInviteStatus === 'approved') {
                         acceptButton = '<button class="btn btn-success" onclick="showSubmitForm(\'' + t.id + '\')">Submit Work</button>';
-                    } else if (t.collaborable && t.acceptedCount === 0) {
-                        // First to accept becomes leader
-                        acceptButton = `<button class="btn btn-accept" onclick="acceptTask('${t.id}')">Accept as Leader</button>`;
                     } else {
                         acceptButton = `<button class="btn btn-accept" onclick="acceptTask('${t.id}')">Accept (${t.acceptedCount}/${maxCollab})</button>`;
                     }
@@ -961,7 +928,6 @@
                             <div><span class="badge primary">${t.category||'other'}</span> <span class="badge warning">${t.difficulty||'medium'}</span></div>
                             <div class="task-amount">$${(parseFloat(t.reward)||0).toFixed(2)}</div>
                             ${expired && !t.userSubmitted ? '<div class="expired-message"><i class="fas fa-clock"></i> Deadline passed</div>' : ''}
-                            ${t.collaborable && t.team && t.team.length ? `<div class="team-list"><i class="fas fa-users"></i> Team: ${t.team.join(', ')}</div>` : ''}
                             <div style="display:flex; gap:0.5rem;">
                                 <button class="btn btn-secondary" onclick="viewTaskDetails('${t.id}')" style="flex:1;">Details</button>
                                 ${acceptButton}
@@ -1036,7 +1002,6 @@
             applyFilters();
         }
 
-        // Modified acceptTask to handle collaborable tasks
         async function acceptTask(taskId) {
             try {
                 const acceptRef = db.collection('tasks').doc(taskId).collection('taskAccepts').doc(currentUser.uid);
@@ -1066,14 +1031,10 @@
                         userEmail: currentUser.email,
                         userName: userData.displayName,
                         acceptedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        status: task.collaborable ? 'pending' : 'approved' // pending for team lead, approved for non-collab
+                        status: 'approved'
                     });
                 });
-                if (task.collaborable) {
-                    showTeamBuilder(taskId);
-                } else {
-                    showSubmitForm(taskId);
-                }
+                showSubmitForm(taskId);
             } catch (error) {
                 console.error('Accept error:', error);
                 showAlert(error.message, 'error');
@@ -1173,83 +1134,6 @@
             }
         }
 
-        // -------------------- TEAM BUILDER (simplified) --------------------
-        async function showTeamBuilder(taskId) {
-            const taskDoc = await db.collection('tasks').doc(taskId).get();
-            const task = taskDoc.data();
-            showModal(`
-                <div class="team-builder">
-                    <h3>Build Your Team for "${escapeHtml(task.title)}"</h3>
-                    <p>You are the team leader. Invite other verified users by email.</p>
-                    <div style="display:flex; gap:0.5rem;">
-                        <input type="email" id="inviteEmail" placeholder="user@example.com" style="flex:1;">
-                        <button class="btn btn-primary" onclick="sendInvitation('${taskId}')">Send Invite</button>
-                    </div>
-                    <div id="invitedList" style="margin-top:1rem;"></div>
-                    <div style="margin-top:1.5rem;">
-                        <button class="btn btn-success" onclick="submitTeamForApproval('${taskId}')">Submit Team for Approval</button>
-                        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
-                    </div>
-                </div>
-            `);
-            loadInvitedUsers(taskId);
-        }
-
-        async function sendInvitation(taskId) {
-            const email = document.getElementById('inviteEmail').value.trim();
-            if (!email) { showAlert('Please enter an email', 'error'); return; }
-            // Find user by email
-            const userSnap = await db.collection('users').where('email', '==', email).limit(1).get();
-            if (userSnap.empty) { showAlert('No user found with that email', 'error'); return; }
-            const invitee = userSnap.docs[0];
-            if (!invitee.data().verified) { showAlert('User is not verified', 'error'); return; }
-            if (invitee.id === currentUser.uid) { showAlert('You cannot invite yourself', 'error'); return; }
-            // Check if already invited
-            const existing = await db.collection('tasks').doc(taskId).collection('taskInvites').where('userId', '==', invitee.id).get();
-            if (!existing.empty) { showAlert('User already invited', 'error'); return; }
-            // Create invite
-            await db.collection('tasks').doc(taskId).collection('taskInvites').doc(invitee.id).set({
-                userId: invitee.id,
-                userEmail: invitee.data().email,
-                invitedBy: currentUser.uid,
-                invitedByName: userData.displayName,
-                status: 'pending',
-                invitedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            // Send notification
-            await sendNotification(invitee.id, 'Team Invitation', `You have been invited to join the team for task "${task.title}".`, 'task', `task:${taskId}`);
-            showAlert('Invitation sent!', 'success');
-            loadInvitedUsers(taskId);
-        }
-
-        async function loadInvitedUsers(taskId) {
-            const list = document.getElementById('invitedList');
-            if (!list) return;
-            const snap = await db.collection('tasks').doc(taskId).collection('taskInvites').get();
-            if (snap.empty) {
-                list.innerHTML = '<p>No invites sent yet.</p>';
-                return;
-            }
-            let html = '<h4>Invited Users:</h4><ul>';
-            snap.forEach(doc => {
-                const inv = doc.data();
-                html += `<li>${inv.userEmail} - <span class="badge ${inv.status}">${inv.status}</span></li>`;
-            });
-            html += '</ul>';
-            list.innerHTML = html;
-        }
-
-        async function submitTeamForApproval(taskId) {
-            // This would notify admin that the team is ready for approval.
-            // For simplicity, we just send a notification to admin.
-            const adminId = await getAdminId();
-            if (adminId) {
-                await sendNotification(adminId, 'Team Ready for Approval', `Team for task ${taskId} is ready for admin approval.`, 'team', `admin:teams`);
-            }
-            showAlert('Team submitted for admin approval. You will be notified when members are approved.', 'success');
-            closeModal();
-        }
-
         // -------------------- SUBMISSIONS --------------------
         async function loadSubmissions() {
             currentTaskViewed = null; refreshMirror();
@@ -1276,7 +1160,7 @@
             }
         }
 
-        // -------------------- WITHDRAWALS (with immediate deduction and pending check) --------------------
+        // -------------------- WITHDRAWALS --------------------
         async function loadWithdrawals() {
             currentTaskViewed = null; refreshMirror();
             try {
@@ -1319,7 +1203,13 @@
             const message = document.getElementById('petitionMessage')?.value;
             if (!message || message.trim() === '') { showAlert('Please enter your petition message.', 'error'); return; }
             try {
-                await db.collection('petitions').add({ userId: currentUser.uid, userEmail: currentUser.email, message: message.trim(), status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                await db.collection('petitions').add({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    message: message.trim(),
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
                 showAlert('Petition sent to admin. You will be notified when responded.', 'success');
                 document.getElementById('petitionMessage').value = '';
             } catch (e) {
@@ -1327,8 +1217,16 @@
                 showAlert('Error sending petition. Please try again. If problem persists send message instead.', 'error');
             }
         }
-        function simulateWithdrawalAttempt() { showModal(`<div class="modal-content"><i class="fas fa-spinner fa-spin" style="font-size:3rem;"></i><h3>Processing...</h3></div>`); setTimeout(() => { closeModal(); showUpgradePrompt(); }, 2000); }
-        function showUpgradePrompt() { showModal(`<div class="modal-content"><i class="fas fa-exclamation-circle" style="font-size:4rem; color:#ef4444;"></i><h3>Withdrawal Failed</h3><p>You need a premium membership.</p><button class="btn btn-success" onclick="showMembershipOptions()">Upgrade Now</button><button class="btn btn-secondary" onclick="closeModal()">Later</button></div>`); }
+
+        function simulateWithdrawalAttempt() {
+            showModal(`<div class="modal-content"><i class="fas fa-spinner fa-spin" style="font-size:3rem;"></i><h3>Processing...</h3></div>`);
+            setTimeout(() => { closeModal(); showUpgradePrompt(); }, 2000);
+        }
+
+        function showUpgradePrompt() {
+            showModal(`<div class="modal-content"><i class="fas fa-exclamation-circle" style="font-size:4rem; color:#ef4444;"></i><h3>Withdrawal Failed</h3><p>You need a premium membership.</p><button class="btn btn-success" onclick="showMembershipOptions()">Upgrade Now</button><button class="btn btn-secondary" onclick="closeModal()">Later</button></div>`);
+        }
+
         function updateFeeBreakdown(maxBal) {
             const amt = parseFloat(document.getElementById('withdrawAmount')?.value) || 0;
             const fb = document.getElementById('feeBreakdown');
@@ -1346,7 +1244,6 @@
                 showAlert(`Minimum withdrawal is $${MIN_WITHDRAWAL}`, 'error');
                 return;
             }
-            // Prevent new request if a pending withdrawal exists
             const pendingSnap = await db.collection('withdrawals')
                 .where('userId', '==', currentUser.uid)
                 .where('status', '==', 'pending')
@@ -1355,7 +1252,6 @@
                 showAlert('You have a pending withdrawal request. Please wait until it is processed.', 'error');
                 return;
             }
-
             try {
                 await db.runTransaction(async (transaction) => {
                     const userRef = db.collection('users').doc(currentUser.uid);
@@ -1363,11 +1259,7 @@
                     if (!userDoc.exists) throw new Error('User not found');
                     const bal = userDoc.data().wallet || 0;
                     if (amt > bal) throw new Error('Insufficient balance');
-
-                    // Deduct amount immediately
                     transaction.update(userRef, { wallet: firebase.firestore.FieldValue.increment(-amt) });
-
-                    // Create withdrawal record with fees
                     const withdrawalRef = db.collection('withdrawals').doc();
                     transaction.set(withdrawalRef, {
                         userId: currentUser.uid,
@@ -1383,14 +1275,14 @@
                     });
                 });
                 showAlert('Withdrawal requested! Amount deducted from your wallet.', 'success');
-                loadWithdrawals(); // Refresh the withdrawals tab
+                loadWithdrawals();
             } catch (e) {
                 console.error('Withdrawal error:', e);
                 showAlert(e.message || 'Error requesting withdrawal', 'error');
             }
         }
 
-        // -------------------- MEMBERSHIP OPTIONS (with Pay Now button) --------------------
+        // -------------------- MEMBERSHIP OPTIONS --------------------
         function showMembershipOptions() {
             const premiumPkg = (membershipPackages && membershipPackages.premium) || DEFAULT_MEMBERSHIP_PACKAGES.premium;
             const elitePkg = (membershipPackages && membershipPackages.elite) || DEFAULT_MEMBERSHIP_PACKAGES.elite;
@@ -1583,7 +1475,7 @@
             }
         }
 
-        // -------------------- MESSAGES (with senderName) --------------------
+        // -------------------- MESSAGES --------------------
         async function loadMessages() {
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading messages...</p></div>';
@@ -1883,7 +1775,6 @@
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading leaderboard...</p></div>';
             try {
-                // Try to get admin-defined leaderboard first
                 const leaderboardSnap = await db.collection('leaderboard').orderBy('rank', 'asc').get();
                 if (!leaderboardSnap.empty) {
                     let html = '<h3>🏆 Leaderboard (Admin curated)</h3><table class="leaderboard-table"><tr><th>Rank</th><th>User</th><th>Points</th></tr>';
@@ -1894,7 +1785,6 @@
                     html += '</table>';
                     document.getElementById('content').innerHTML = html;
                 } else {
-                    // Fallback: compute from users (wallet + approved submissions)
                     const usersSnap = await db.collection('users').get();
                     const leaderboard = [];
                     for (const doc of usersSnap.docs) {
@@ -1964,7 +1854,6 @@
                 const submissionsSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','approved').get();
                 const withdrawalsSnap = await db.collection('withdrawals').where('userId','==',currentUser.uid).where('status','==','paid').get();
 
-                // Aggregate earnings by date (last 30 days)
                 const earningsByDate = new Map();
                 const today = new Date();
                 for (let i = 29; i >= 0; i--) {
@@ -1989,7 +1878,7 @@
                     if (wd.requestedAt && wd.amount) {
                         const date = wd.requestedAt.toDate().toISOString().split('T')[0];
                         if (earningsByDate.has(date)) {
-                            earningsByDate.set(date, earningsByDate.get(date) - wd.amount); // subtract withdrawals
+                            earningsByDate.set(date, earningsByDate.get(date) - wd.amount);
                         }
                     }
                 });
@@ -2028,7 +1917,7 @@
             }
         }
 
-        // Helper for notifications (used in team builder)
+        // Helper for notifications (unused now, but kept)
         async function sendNotification(userId, title, message, type, link) {
             try {
                 await db.collection('notifications').add({
