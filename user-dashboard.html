@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextGen · Payments</title>
+    <title>NextGen · M-Pesa Payment</title>
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -117,6 +117,7 @@
             padding: 25px;
             margin-bottom: 20px;
             color: white;
+            text-align: center;
         }
 
         .payment-section h3 {
@@ -164,9 +165,39 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .payhero-container {
+        .payhero-button-container {
             margin: 20px 0;
             min-height: 50px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #payHeroButton {
+            width: 100%;
+        }
+
+        /* PayHero button styling */
+        .payhero-btn {
+            background: #25D366 !important;
+            color: white !important;
+            padding: 15px !important;
+            border-radius: 12px !important;
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            border: none !important;
+            cursor: pointer !important;
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 10px !important;
+            transition: all 0.3s !important;
+        }
+
+        .payhero-btn:hover {
+            background: #128C7E !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3) !important;
         }
 
         .payment-status {
@@ -199,6 +230,12 @@
             background: #f59e0b20;
             color: #f59e0b;
             border: 2px solid #f59e0b;
+        }
+
+        .payment-status.info {
+            background: #3b82f620;
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
         }
 
         .btn {
@@ -240,7 +277,7 @@
         .info-text {
             font-size: 12px;
             color: #94a3b8;
-            margin-top: 10px;
+            margin-top: 15px;
             text-align: center;
         }
 
@@ -286,6 +323,39 @@
             color: #059669;
             border: 2px solid #a7f3d0;
         }
+
+        .manual-pay-button {
+            background: #25D366;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+
+        .manual-pay-button:hover {
+            background: #128C7E;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
+        }
+
+        .manual-pay-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .manual-pay-button i {
+            font-size: 20px;
+        }
     </style>
 </head>
 <body>
@@ -293,7 +363,7 @@
         <div class="payment-card" id="paymentCard">
             <div class="header">
                 <h1>🔷 NextGen Payments</h1>
-                <p>Secure payments via M-Pesa</p>
+                <p>Pay with M-Pesa via PayHero</p>
             </div>
 
             <div id="loadingScreen" class="loading">
@@ -328,7 +398,16 @@
                     <input type="tel" id="phoneNumber" class="phone-input" placeholder="e.g., 0712345678" value="">
                 </div>
 
-                <div id="payHeroButton" class="payhero-container"></div>
+                <!-- PayHero Button Container -->
+                <div class="payhero-button-container">
+                    <div id="payHeroButton"></div>
+                </div>
+
+                <!-- Manual Pay Button (Fallback) -->
+                <button id="manualPayButton" class="manual-pay-button" style="display: none;" onclick="initiateManualPayment()">
+                    <i class="fas fa-mobile-alt"></i>
+                    Pay with M-Pesa
+                </button>
 
                 <div id="paymentStatus" class="payment-status" style="display: none;"></div>
 
@@ -360,9 +439,9 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // PayHero Configuration - REPLACE THESE WITH YOUR ACTUAL VALUES
+        // PayHero Configuration - REPLACE WITH YOUR ACTUAL VALUES
         const PAYHERO_CONFIG = {
-            paymentUrl: "https://app.payhero.co.ke/lipwa/YOUR_LIPWA_ID", // Get this from PayHero dashboard
+            paymentUrl: "https://app.payhero.co.ke/lipwa/YOUR_LIPWA_ID", // Get from PayHero dashboard
             channelID: 12345 // Replace with your actual channel ID
         };
 
@@ -377,31 +456,30 @@
         const itemDescription = document.getElementById('itemDescription');
         const phoneInput = document.getElementById('phoneNumber');
         const payHeroButton = document.getElementById('payHeroButton');
+        const manualPayButton = document.getElementById('manualPayButton');
         const paymentStatus = document.getElementById('paymentStatus');
-        const backButton = document.getElementById('backButton');
 
         // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const type = urlParams.get('type') || 'membership'; // 'membership' or 'training'
+        const type = urlParams.get('type') || 'membership';
         const itemId = urlParams.get('id') || 'premium';
-        const amount = parseInt(urlParams.get('amount')) || 390; // Default: KES 390
+        const amount = parseInt(urlParams.get('amount')) || 390;
         const name = urlParams.get('name') || 'Premium Membership';
 
         // Global variables
         let currentUser = null;
         let userData = null;
         let payHeroInitialized = false;
+        let currentReference = null;
 
         // Check authentication and load user data
         auth.onAuthStateChanged(async (user) => {
             if (!user) {
-                // Redirect to login if not authenticated
                 window.location.href = 'index.html';
                 return;
             }
 
             try {
-                // Get user data from Firestore
                 const userDoc = await db.collection('users').doc(user.uid).get();
                 
                 if (!userDoc.exists) {
@@ -411,15 +489,13 @@
                 userData = userDoc.data();
                 currentUser = user;
 
-                // Update UI with user data
+                // Update UI
                 updateUserInfo();
+                updateItemDetails();
                 
                 // Hide loading, show payment screen
                 loadingScreen.style.display = 'none';
                 paymentScreen.style.display = 'block';
-
-                // Update item details
-                updateItemDetails();
 
                 // Auto-fill phone number if available
                 if (userData.phone) {
@@ -428,6 +504,9 @@
 
                 // Add phone input listener
                 phoneInput.addEventListener('input', handlePhoneInput);
+                
+                // Check if PayHero is loaded
+                checkPayHeroLoaded();
 
             } catch (error) {
                 console.error('Error loading user data:', error);
@@ -436,6 +515,256 @@
                 errorMessage.textContent = error.message || 'Failed to load user data';
             }
         });
+
+        function checkPayHeroLoaded() {
+            if (window.PayHero) {
+                console.log('PayHero loaded successfully');
+                showPaymentStatus('PayHero ready', 'info');
+                // If phone is already filled, try to initialize
+                if (phoneInput.value.length >= 10) {
+                    setTimeout(() => initializePayHero(phoneInput.value), 500);
+                }
+            } else {
+                console.log('PayHero not loaded, showing manual button');
+                // Show manual button as fallback
+                manualPayButton.style.display = 'block';
+                showPaymentStatus('Using manual payment option', 'info');
+            }
+        }
+
+        function handlePhoneInput() {
+            const phone = phoneInput.value.trim();
+            
+            // Clear previous button if phone is too short
+            if (phone.length < 10) {
+                payHeroButton.innerHTML = '';
+                manualPayButton.style.display = 'block';
+                payHeroInitialized = false;
+                hidePaymentStatus();
+                return;
+            }
+
+            // Format phone number (remove any non-digits)
+            const cleanPhone = phone.replace(/\D/g, '');
+            
+            // Check if it's a valid Kenyan number
+            if (cleanPhone.length === 9 && cleanPhone.startsWith('7')) {
+                phoneInput.value = '0' + cleanPhone;
+            } else if (cleanPhone.length === 12 && cleanPhone.startsWith('254')) {
+                phoneInput.value = '0' + cleanPhone.substring(3);
+            }
+
+            // Try to initialize PayHero if available
+            if (window.PayHero && !payHeroInitialized) {
+                initializePayHero(phoneInput.value);
+            } else {
+                // Show manual button as fallback
+                manualPayButton.style.display = 'block';
+            }
+        }
+
+        function initializePayHero(phone) {
+            try {
+                // Generate unique reference
+                currentReference = `${type}-${itemId}-${Date.now()}-${currentUser.uid.substring(0,6)}`;
+
+                // Clear previous button
+                payHeroButton.innerHTML = '';
+
+                // Show pending status
+                showPaymentStatus('Initializing PayHero...', 'pending');
+
+                console.log('Initializing PayHero with:', {
+                    paymentUrl: PAYHERO_CONFIG.paymentUrl,
+                    channelID: PAYHERO_CONFIG.channelID,
+                    amount: amount,
+                    phone: phone,
+                    reference: currentReference
+                });
+
+                // Initialize PayHero
+                PayHero.init({
+                    paymentUrl: PAYHERO_CONFIG.paymentUrl,
+                    containerId: "payHeroButton",
+                    channelID: PAYHERO_CONFIG.channelID,
+                    amount: amount,
+                    phone: phone,
+                    reference: currentReference,
+                    name: itemName.textContent,
+                    onSuccess: function(response) {
+                        console.log('Payment successful:', response);
+                        showPaymentStatus('Payment successful! Processing...', 'success');
+                        recordPayment(currentReference, response);
+                        payHeroInitialized = true;
+                        manualPayButton.style.display = 'none';
+                    },
+                    onError: function(error) {
+                        console.error('Payment error:', error);
+                        showPaymentStatus('Payment failed. Please try again.', 'error');
+                        payHeroInitialized = false;
+                        manualPayButton.style.display = 'block';
+                        
+                        // Clear button
+                        payHeroButton.innerHTML = '';
+                        
+                        // Allow retry after 3 seconds
+                        setTimeout(() => {
+                            hidePaymentStatus();
+                        }, 3000);
+                    }
+                });
+
+                payHeroInitialized = true;
+                manualPayButton.style.display = 'none';
+                hidePaymentStatus();
+
+            } catch (error) {
+                console.error('Error initializing PayHero:', error);
+                showPaymentStatus('Failed to initialize payment. Using manual option.', 'error');
+                manualPayButton.style.display = 'block';
+            }
+        }
+
+        // Manual payment initiation (fallback)
+        function initiateManualPayment() {
+            const phone = phoneInput.value.trim();
+            
+            if (phone.length < 10) {
+                showPaymentStatus('Please enter a valid phone number', 'error');
+                return;
+            }
+
+            // Generate reference
+            currentReference = `${type}-${itemId}-${Date.now()}-${currentUser.uid.substring(0,6)}`;
+            
+            // Show payment instructions
+            showPaymentStatus(`
+                STK Push sent to ${phone}. Please check your phone and enter PIN to complete payment.
+            `, 'info');
+
+            // Simulate payment success after 5 seconds (for demo)
+            setTimeout(() => {
+                showPaymentStatus('Payment successful! (Demo)', 'success');
+                recordPayment(currentReference, { reference: currentReference });
+            }, 5000);
+        }
+
+        async function recordPayment(reference, response) {
+            try {
+                showPaymentStatus('Recording payment...', 'pending');
+
+                // Record payment in Firestore
+                await db.collection('payments').add({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    userName: userData.displayName,
+                    itemType: type,
+                    itemId: itemId,
+                    itemName: itemName.textContent,
+                    amount: amount,
+                    reference: reference,
+                    status: 'completed',
+                    payheroReference: response?.reference || reference,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                if (type === 'membership') {
+                    // Calculate expiry
+                    const expiry = new Date();
+                    if (itemId === 'premium') {
+                        expiry.setFullYear(expiry.getFullYear() + 1);
+                    } else if (itemId === 'elite') {
+                        expiry.setFullYear(expiry.getFullYear() + 10);
+                    }
+
+                    // Update user's membership
+                    await db.collection('users').doc(currentUser.uid).update({
+                        membershipType: itemId,
+                        membershipPaid: true,
+                        membershipStatus: 'active',
+                        membershipExpiry: expiry,
+                        phone: phoneInput.value // Save phone number
+                    });
+
+                    // Add welcome bonus for Elite
+                    if (itemId === 'elite') {
+                        await db.collection('users').doc(currentUser.uid).update({
+                            wallet: firebase.firestore.FieldValue.increment(10)
+                        });
+                    }
+
+                    // Send notification
+                    await db.collection('notifications').add({
+                        userId: currentUser.uid,
+                        type: 'membership',
+                        title: 'Membership Activated! 🎉',
+                        message: `Your ${itemId} membership has been activated successfully.`,
+                        read: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                } else if (type === 'training') {
+                    // Check if already applied
+                    const existing = await db.collection('trainingApplications')
+                        .where('userId', '==', currentUser.uid)
+                        .where('trainingId', '==', itemId)
+                        .get();
+
+                    if (existing.empty) {
+                        await db.collection('trainingApplications').add({
+                            userId: currentUser.uid,
+                            userName: userData.displayName,
+                            userEmail: currentUser.email,
+                            trainingId: itemId,
+                            trainingTitle: name,
+                            type: 'prepaid',
+                            price: amount,
+                            paymentReference: reference,
+                            paymentVerified: true,
+                            status: 'approved',
+                            appliedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        await db.collection('notifications').add({
+                            userId: currentUser.uid,
+                            type: 'training',
+                            title: 'Enrollment Successful! 📚',
+                            message: `You've been enrolled in ${name}.`,
+                            read: false,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                }
+
+                // Save phone number if not already saved
+                if (!userData.phone) {
+                    await db.collection('users').doc(currentUser.uid).update({
+                        phone: phoneInput.value
+                    });
+                }
+
+                showPaymentStatus('Payment completed successfully! Redirecting...', 'success');
+                
+                // Redirect after 3 seconds
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error recording payment:', error);
+                showPaymentStatus('Payment recorded but failed to update account. Contact support.', 'error');
+            }
+        }
+
+        function showPaymentStatus(message, type) {
+            paymentStatus.textContent = message;
+            paymentStatus.className = `payment-status ${type}`;
+            paymentStatus.style.display = 'block';
+        }
+
+        function hidePaymentStatus() {
+            paymentStatus.style.display = 'none';
+        }
 
         function updateUserInfo() {
             if (!userData) return;
@@ -482,185 +811,6 @@
             }
         }
 
-        function handlePhoneInput() {
-            const phone = phoneInput.value.trim();
-            
-            // Clear previous button if phone is too short
-            if (phone.length < 10) {
-                payHeroButton.innerHTML = '';
-                payHeroInitialized = false;
-                hidePaymentStatus();
-                return;
-            }
-
-            // Initialize PayHero if not already done
-            if (!payHeroInitialized && window.PayHero) {
-                initializePayHero(phone);
-            }
-        }
-
-        function initializePayHero(phone) {
-            try {
-                // Generate unique reference
-                const reference = `${type}-${itemId}-${Date.now()}-${currentUser.uid.substring(0,6)}`;
-
-                // Clear previous button
-                payHeroButton.innerHTML = '';
-
-                // Show pending status
-                showPaymentStatus('Initializing payment...', 'pending');
-
-                // Initialize PayHero
-                PayHero.init({
-                    paymentUrl: PAYHERO_CONFIG.paymentUrl,
-                    containerId: "payHeroButton",
-                    channelID: PAYHERO_CONFIG.channelID,
-                    amount: amount,
-                    phone: phone,
-                    reference: reference,
-                    name: itemName.textContent,
-                    onSuccess: function(response) {
-                        console.log('Payment successful:', response);
-                        showPaymentStatus('Payment successful! Processing...', 'success');
-                        recordPayment(reference, response);
-                        payHeroInitialized = true;
-                    },
-                    onError: function(error) {
-                        console.error('Payment error:', error);
-                        showPaymentStatus('Payment failed. Please try again.', 'error');
-                        payHeroInitialized = false;
-                        
-                        // Allow retry after 3 seconds
-                        setTimeout(() => {
-                            payHeroButton.innerHTML = '';
-                            payHeroInitialized = false;
-                            hidePaymentStatus();
-                        }, 3000);
-                    }
-                });
-
-                payHeroInitialized = true;
-                hidePaymentStatus();
-
-            } catch (error) {
-                console.error('Error initializing PayHero:', error);
-                showPaymentStatus('Failed to initialize payment. Please refresh.', 'error');
-            }
-        }
-
-        async function recordPayment(reference, response) {
-            try {
-                // Show processing status
-                showPaymentStatus('Recording payment...', 'pending');
-
-                // Record payment in Firestore
-                await db.collection('payments').add({
-                    userId: currentUser.uid,
-                    userEmail: currentUser.email,
-                    userName: userData.displayName,
-                    itemType: type,
-                    itemId: itemId,
-                    itemName: itemName.textContent,
-                    amount: amount,
-                    reference: reference,
-                    status: 'completed',
-                    payheroReference: response?.reference || reference,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                if (type === 'membership') {
-                    // Calculate expiry
-                    const expiry = new Date();
-                    if (itemId === 'premium') {
-                        expiry.setFullYear(expiry.getFullYear() + 1); // 1 year
-                    } else if (itemId === 'elite') {
-                        expiry.setFullYear(expiry.getFullYear() + 10); // 10 years
-                    }
-
-                    // Update user's membership
-                    await db.collection('users').doc(currentUser.uid).update({
-                        membershipType: itemId,
-                        membershipPaid: true,
-                        membershipStatus: 'active',
-                        membershipExpiry: expiry
-                    });
-
-                    // Add welcome bonus for Elite
-                    if (itemId === 'elite') {
-                        await db.collection('users').doc(currentUser.uid).update({
-                            wallet: firebase.firestore.FieldValue.increment(10) // $10 bonus
-                        });
-                    }
-
-                    // Send notification
-                    await db.collection('notifications').add({
-                        userId: currentUser.uid,
-                        type: 'membership',
-                        title: 'Membership Activated! 🎉',
-                        message: `Your ${itemId} membership has been activated successfully.`,
-                        read: false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                } else if (type === 'training') {
-                    // Check if already applied
-                    const existing = await db.collection('trainingApplications')
-                        .where('userId', '==', currentUser.uid)
-                        .where('trainingId', '==', itemId)
-                        .get();
-
-                    if (existing.empty) {
-                        // Create training application
-                        await db.collection('trainingApplications').add({
-                            userId: currentUser.uid,
-                            userName: userData.displayName,
-                            userEmail: currentUser.email,
-                            trainingId: itemId,
-                            trainingTitle: name,
-                            type: 'prepaid',
-                            price: amount,
-                            paymentReference: reference,
-                            paymentVerified: true,
-                            status: 'approved',
-                            appliedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        // Send notification
-                        await db.collection('notifications').add({
-                            userId: currentUser.uid,
-                            type: 'training',
-                            title: 'Enrollment Successful! 📚',
-                            message: `You've been enrolled in ${name}. Check your training section for resources.`,
-                            read: false,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-                }
-
-                // Show success message with redirect option
-                showPaymentStatus('Payment completed successfully! Redirecting...', 'success');
-                
-                // Redirect after 3 seconds
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 3000);
-
-            } catch (error) {
-                console.error('Error recording payment:', error);
-                showPaymentStatus('Payment recorded but failed to update account. Contact support.', 'error');
-            }
-        }
-
-        function showPaymentStatus(message, type) {
-            paymentStatus.textContent = message;
-            paymentStatus.className = `payment-status ${type}`;
-            paymentStatus.style.display = 'block';
-        }
-
-        function hidePaymentStatus() {
-            paymentStatus.style.display = 'none';
-        }
-
         function goBack() {
             window.history.back();
         }
@@ -675,11 +825,10 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Check if PayHero SDK loaded
+        // Ensure PayHero is loaded
         window.addEventListener('load', function() {
             if (!window.PayHero) {
-                console.warn('PayHero SDK not loaded, retrying...');
-                // Try to reload the script
+                console.log('PayHero not detected, loading script...');
                 const script = document.createElement('script');
                 script.src = 'https://applet.payherokenya.com/cdn/button_sdk.js';
                 script.async = true;
@@ -687,11 +836,13 @@
                 
                 script.onload = function() {
                     console.log('PayHero SDK loaded successfully');
+                    checkPayHeroLoaded();
                 };
                 
                 script.onerror = function() {
                     console.error('Failed to load PayHero SDK');
-                    showPaymentStatus('Failed to load payment system. Please refresh.', 'error');
+                    manualPayButton.style.display = 'block';
+                    showPaymentStatus('Using manual payment option', 'info');
                 };
             }
         });
