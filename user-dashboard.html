@@ -347,7 +347,7 @@
     </style>
 </head>
 <body>
-    <!-- Mobile Navigation -->
+    <!-- Mobile Navigation (unchanged) -->
     <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()"></div>
     <div class="mobile-nav" id="mobileNav">
         <div class="mobile-nav-header">
@@ -1217,7 +1217,7 @@
                 invitedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             // Send notification
-            await sendNotification(invitee.id, 'Team Invitation', `You have been invited to join the team for task "${taskTitle}".`, 'task', `task:${taskId}`);
+            await sendNotification(invitee.id, 'Team Invitation', `You have been invited to join the team for task "${task.title}".`, 'task', `task:${taskId}`);
             showAlert('Invitation sent!', 'success');
             loadInvitedUsers(taskId);
         }
@@ -1390,7 +1390,7 @@
             }
         }
 
-        // -------------------- MEMBERSHIP OPTIONS --------------------
+        // -------------------- MEMBERSHIP OPTIONS (with Pay Now button) --------------------
         function showMembershipOptions() {
             const premiumPkg = (membershipPackages && membershipPackages.premium) || DEFAULT_MEMBERSHIP_PACKAGES.premium;
             const elitePkg = (membershipPackages && membershipPackages.elite) || DEFAULT_MEMBERSHIP_PACKAGES.elite;
@@ -1419,7 +1419,12 @@
                             </label>
                         </div>
                     </div>
-                    <div style="margin-top:2rem; padding:1.5rem; background:#f1f5f9;">
+                    <!-- Pay Now Button -->
+                    <a href="${paymentUrl}" target="_blank" class="btn btn-success" style="display:inline-block; margin-bottom:1rem; padding:1rem 2rem; font-size:1.2rem;">
+                        <i class="fas fa-credit-card"></i> Pay Now
+                    </a>
+                    <p style="color:#64748b; margin-bottom:1rem;">After payment, enter your transaction details below</p>
+                    <div style="margin-top:1rem; padding:1.5rem; background:#f1f5f9;">
                         <h4>Payment Verification</h4>
                         <textarea id="paymentMessage" class="smart-textarea" placeholder="Paste transaction ID / payment details..."></textarea>
                         <button class="btn btn-success" onclick="submitPaymentVerification()">Submit for Approval</button>
