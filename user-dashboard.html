@@ -883,17 +883,17 @@
         }
 
         function getStatValue(index) { const el = document.querySelector(`.stat-card:nth-child(${index}) .stat-value`); return el ? el.textContent : '0'; }
-        function getSubmissionCount(status) { return '...'; }
-        function getTotalEarned() { return '0.00'; }
+        function getSubmissionCount(status) { return '0'; }
+        function getTotalEarned() { return 0; }
         function getAcceptedCount() { 
             const badge = document.getElementById('desktopSubmitBadge'); 
             return badge && badge.style.display !== 'none' ? badge.textContent : '0'; 
         }
         function getUnreadMessagesCount() { const badge = document.getElementById('unreadMessagesBadge'); return badge && badge.style.display !== 'none' ? badge.textContent : '0'; }
-        function getTotalMessageThreads() { return '...'; }
-        function getWithdrawalCount(status) { return '...'; }
+        function getTotalMessageThreads() { return '0'; }
+        function getWithdrawalCount(status) { return '0'; }
         function getUnreadNotificationsCount() { const badge = document.getElementById('unreadNotifBadge'); return badge && badge.style.display !== 'none' ? badge.textContent : '0'; }
-        function getTotalNotificationsCount() { return '...'; }
+        function getTotalNotificationsCount() { return '0'; }
         function formatJoinDate(ts) { if (!ts) return 'N/A'; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString(); }
         function escapeHtml(unsafe) { if (!unsafe) return unsafe; return unsafe.replace(/[&<>"]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;'; return m; }); }
         function refreshMirror() { updateMirrorForTab(currentTab); }
@@ -1457,8 +1457,103 @@
             }
         }
 
-        // -------------------- SUBMISSIONS (unchanged) --------------------
-        async function loadSubmissions() { /* unchanged */ currentTaskViewed = null; refreshMirror(); document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading submissions...</p></div>'; try { const snap = await db.collection('submissions').where('userId','==',currentUser.uid).get(); let html = '<h3>My Submissions</h3>'; if (snap.empty) html += '<div class="empty-state"><i class="fas fa-file-alt"></i><p>No submissions yet.</p></div>'; else { const subs = []; snap.forEach(d => subs.push({ id: d.id, ...d.data() })); subs.sort((a,b) => (b.submittedAt?.seconds||0) - (a.submittedAt?.seconds||0)); html += '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:0.8rem;">'; subs.forEach(s => { const sc = s.status === 'approved' ? 'success' : s.status === 'rejected' ? 'danger' : 'warning'; const date = s.submittedAt?.seconds ? new Date(s.submittedAt.seconds*1000).toLocaleDateString() : 'N/A'; html += `<div class="submission-card" style="padding:1rem;"><div style="display:flex; justify-content:space-between;"><h4 style="font-size:0.9rem;">${escapeHtml(s.taskTitle||'Untitled')}</h4><span class="badge ${sc}">${s.status}</span></div><p style="color:#64748b; font-size:0.75rem;">${escapeHtml((s.workText||'').substring(0,60))}...</p><div style="display:flex; gap:0.5rem; font-size:0.7rem; color:#64748b;"><span><i class="far fa-calendar"></i> ${date}</span>${s.earned ? `<span><i class="fas fa-dollar-sign"></i> ${formatBoth(s.earned)}</span>` : ''}${s.wordCount ? `<span><i class="fas fa-file-word"></i> ${s.wordCount} words</span>` : ''}</div>${s.review ? `<p style="background:#f1f5f9; padding:0.3rem; border-radius:0.3rem; font-size:0.7rem;"><strong>Feedback:</strong> ${escapeHtml(s.review)}</p>` : ''}</div>`; }); html += '</div>'; } document.getElementById('content').innerHTML = html; } catch (e) { document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadSubmissions()">Retry</button></div>`; } }
+        // -------------------- SUBMISSIONS (CORRECTED) --------------------
+        async function loadSubmissions() {
+            currentTaskViewed = null;
+            refreshMirror();
+            document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading submissions...</p></div>';
+            
+            try {
+                const snap = await db.collection('submissions')
+                    .where('userId', '==', currentUser.uid)
+                    .orderBy('submittedAt', 'desc')
+                    .get();
+                
+                let html = '<h3>📝 My Submissions</h3>';
+                
+                if (snap.empty) {
+                    html += '<div class="empty-state"><i class="fas fa-file-alt"></i><p>No submissions yet.</p><button class="btn btn-primary" onclick="switchTab(\'tasks\')">Browse Tasks</button></div>';
+                } else {
+                    const submissions = [];
+                    snap.forEach(doc => submissions.push({ id: doc.id, ...doc.data() }));
+                    
+                    html += '<div class="submissions-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem;">';
+                    
+                    submissions.forEach(sub => {
+                        const statusClass = sub.status === 'approved' ? 'success' : 
+                                          sub.status === 'rejected' ? 'danger' : 'warning';
+                        const date = sub.submittedAt?.toDate ? 
+                            sub.submittedAt.toDate().toLocaleDateString() : 'N/A';
+                        const earned = sub.earned ? formatBoth(sub.earned) : '';
+                        
+                        html += `
+                            <div class="submission-card" style="background:white; border-radius:1rem; padding:1.2rem; border:1px solid #e2e8f0;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                                    <h4 style="font-size:1rem; font-weight:700; color:#0f172a;">${escapeHtml(sub.taskTitle || 'Untitled')}</h4>
+                                    <span class="badge ${statusClass}">${sub.status}</span>
+                                </div>
+                                
+                                <p style="color:#475569; font-size:0.8rem; margin-bottom:0.5rem; line-height:1.5;">
+                                    ${escapeHtml((sub.workText || '').substring(0, 100))}${(sub.workText || '').length > 100 ? '...' : ''}
+                                </p>
+                                
+                                <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem; font-size:0.7rem; color:#64748b;">
+                                    <span><i class="far fa-calendar"></i> ${date}</span>
+                                    ${sub.wordCount ? `<span><i class="fas fa-file-word"></i> ${sub.wordCount} words</span>` : ''}
+                                    ${earned ? `<span><i class="fas fa-dollar-sign"></i> ${earned}</span>` : ''}
+                                </div>
+                                
+                                ${sub.review ? `
+                                    <div style="background:#f1f5f9; padding:0.8rem; border-radius:0.5rem; margin-top:0.5rem;">
+                                        <strong style="font-size:0.7rem; color:#475569;">Feedback:</strong>
+                                        <p style="font-size:0.75rem; margin-top:0.2rem;">${escapeHtml(sub.review)}</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${sub.status === 'pending' ? `
+                                    <div style="margin-top:0.8rem;">
+                                        <button class="btn btn-warning" onclick="cancelSubmission('${sub.id}')" style="width:100%;">
+                                            <i class="fas fa-times"></i> Cancel Submission
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                }
+                
+                document.getElementById('content').innerHTML = html;
+                
+            } catch (e) {
+                console.error('Error loading submissions:', e);
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i>
+                        <h4>Failed to Load Submissions</h4>
+                        <p>${e.message}</p>
+                        <button class="btn btn-primary" onclick="loadSubmissions()">Try Again</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Add cancel submission function
+        async function cancelSubmission(submissionId) {
+            if (!confirm('Are you sure you want to cancel this submission? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                await db.collection('submissions').doc(submissionId).delete();
+                showAlert('Submission cancelled successfully', 'success');
+                loadSubmissions(); // Refresh the list
+            } catch (e) {
+                console.error('Error cancelling submission:', e);
+                showAlert('Failed to cancel submission', 'error');
+            }
+        }
 
         // -------------------- PENDING SUBMISSIONS (new) --------------------
         async function loadPendingSubmissions() {
