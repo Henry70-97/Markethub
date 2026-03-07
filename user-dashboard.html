@@ -1360,13 +1360,101 @@
 
         async function previewSubmission(taskId) { /* unchanged */ const work = document.getElementById('workText').value; const wc = work.trim().split(/\s+/).filter(w => w.length>0).length; if (wc < 20) { showAlert(`Please provide at least 20 words (current: ${wc})`, 'error'); return; } try { const taskDoc = await db.collection('tasks').doc(taskId).get(); const task = taskDoc.data(); sessionStorage.setItem('pendingSubmission', JSON.stringify({ taskId, work, wc })); showModal(`<div class="modal-content" style="max-width:700px;"><div style="background:linear-gradient(135deg,#6366f1,#8b5cf6); padding:2rem; color:white; border-radius:1rem 1rem 0 0; margin:-2rem -2rem 1.5rem -2rem;"><h3 style="font-size:1.5rem;">Preview Your Submission</h3><p>${escapeHtml(task.title)}</p><div style="display:flex; gap:1rem; margin-top:1rem;"><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-user-circle"></i> ${escapeHtml(task.clientName||'Admin')}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-tag"></i> ${formatBoth(parseFloat(task.reward)||0)}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-file-word"></i> ${wc} words</span></div></div><div style="margin-bottom:1.5rem;"><h4><i class="fas fa-pencil-alt" style="color:#6366f1;"></i> Your Work:</h4><div style="background:#f8fafc; padding:1.5rem; border-left:4px solid #6366f1; max-height:300px; overflow-y:auto;">${work.replace(/\n/g,'<br>')}</div></div><div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:1rem; border-radius:0.5rem; margin-bottom:1.5rem;"><i class="fas fa-info-circle" style="color:#f59e0b;"></i> Please review carefully. Once submitted, you cannot edit.</div><div style="display:flex; gap:1rem;"><button class="btn btn-success" onclick="saveSubmission('${taskId}')">Confirm & Submit</button><button class="btn btn-primary" onclick="showSubmitForm('${taskId}', ${JSON.stringify(work)})">Edit</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button></div></div>`); } catch (e) { showAlert('Error previewing','error'); } }
 
-        async function saveSubmission(taskId) { /* unchanged */ let work = null; const pending = sessionStorage.getItem('pendingSubmission'); if (pending) { const data = JSON.parse(pending); if (data.taskId === taskId) work = data.work; } if (!work) work = document.getElementById('workText')?.value; if (!work) { showAlert('No work found','error'); return; } const wc = work.trim().split(/\s+/).filter(w => w.length>0).length; if (wc < 20) { showAlert('At least 20 words required','error'); return; } try { const taskDoc = await db.collection('tasks').doc(taskId).get(); if (!taskDoc.exists) { showAlert('Task not found','error'); return; } const task = taskDoc.data(); if (isDeadlinePassed(task.deadline)) { showAlert('Task expired','error'); closeModal(); return; } if (await hasUserSubmitted(taskId)) { showAlert('Already submitted','error'); closeModal(); return; } showModal(`<div class="modal-content" style="text-align:center;"><div class="loading-spinner"></div><h3>Submitting...</h3></div>`); await db.collection('submissions').add({ userId: currentUser.uid, userEmail: currentUser.email, taskId: taskId, taskTitle: task.title || 'Untitled', workText: work, status: 'pending', wordCount: wc, submittedAt: firebase.firestore.FieldValue.serverTimestamp() }); // Remove from acceptedTasks and delete draft
+        // ===== IMPROVED saveSubmission FUNCTION (handles sessionStorage safely) =====
+        async function saveSubmission(taskId) {
+            let work = null;
+
+            // Safely retrieve pending submission from sessionStorage
+            try {
+                const pending = sessionStorage.getItem('pendingSubmission');
+                if (pending) {
+                    const data = JSON.parse(pending);
+                    if (data && data.taskId === taskId) {
+                        work = data.work;
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to parse pending submission from sessionStorage', e);
+                sessionStorage.removeItem('pendingSubmission'); // clear corrupted data
+            }
+
+            // If no pending submission, try to get work from the textarea (should not happen in preview mode)
+            if (!work) {
+                const textarea = document.getElementById('workText');
+                if (textarea) work = textarea.value;
+            }
+
+            if (!work) {
+                showAlert('No work found. Please start again.', 'error');
+                return;
+            }
+
+            const wc = work.trim().split(/\s+/).filter(w => w.length > 0).length;
+            if (wc < 20) {
+                showAlert(`At least 20 words required (current: ${wc})`, 'error');
+                return;
+            }
+
+            try {
+                const taskDoc = await db.collection('tasks').doc(taskId).get();
+                if (!taskDoc.exists) {
+                    showAlert('Task not found', 'error');
+                    return;
+                }
+                const task = taskDoc.data();
+
+                if (isDeadlinePassed(task.deadline)) {
+                    showAlert('Task expired', 'error');
+                    closeModal();
+                    return;
+                }
+
+                if (await hasUserSubmitted(taskId)) {
+                    showAlert('You have already submitted this task', 'error');
+                    closeModal();
+                    return;
+                }
+
+                // Show loading spinner
+                showModal(`
+                    <div class="modal-content" style="text-align:center;">
+                        <div class="loading-spinner"></div>
+                        <h3>Submitting...</h3>
+                    </div>
+                `);
+
+                // Save submission to Firestore
+                await db.collection('submissions').add({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    taskId: taskId,
+                    taskTitle: task.title || 'Untitled',
+                    workText: work,
+                    status: 'pending',
+                    wordCount: wc,
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Remove from acceptedTasks and delete draft
                 await db.collection('users').doc(currentUser.uid).collection('acceptedTasks').doc(taskId).delete();
                 clearDraft(taskId);
                 sessionStorage.removeItem('pendingSubmission');
-                showModal(`<div class="modal-content" style="text-align:center;"><div class="success-check"><i class="fas fa-check"></i></div><h3 style="color:#10b981;">Success!</h3><p>Your work has been submitted.<br>${wc} words • Pending review</p><button class="btn btn-success" onclick="loadSubmissions()">View My Submissions</button><button class="btn btn-primary" onclick="loadTasks()">Browse More Tasks</button></div>`);
+
+                // Show success
+                showModal(`
+                    <div class="modal-content" style="text-align:center;">
+                        <div class="success-check"><i class="fas fa-check"></i></div>
+                        <h3 style="color:#10b981;">Success!</h3>
+                        <p>Your work has been submitted.<br>${wc} words • Pending review</p>
+                        <button class="btn btn-success" onclick="loadSubmissions()">View My Submissions</button>
+                        <button class="btn btn-primary" onclick="loadTasks()">Browse More Tasks</button>
+                    </div>
+                `);
                 refreshMirror();
-            } catch (e) { console.error('Error saving submission:', e); showAlert('Error saving submission. Please try again.', 'error'); }
+            } catch (e) {
+                console.error('Error saving submission:', e);
+                showAlert('Error saving submission. Please try again.', 'error');
+            }
         }
 
         // -------------------- SUBMISSIONS (unchanged) --------------------
