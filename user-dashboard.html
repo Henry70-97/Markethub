@@ -514,6 +514,15 @@
             background: #6366f108 !important;
             border-left: 4px solid #6366f1;
         }
+
+        /* New styles for design link input */
+        .url-input-container { margin: 0.8rem 0; }
+        .url-input-label { font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.3rem; }
+        .url-input-label i { color: #6366f1; }
+        .url-input { width: 100%; padding: 0.6rem; border: 2px solid #e2e8f0; border-radius: 40px; font-size: 0.85rem; transition: all 0.3s; }
+        .url-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,0.1); }
+        .url-input.valid { border-color: #10b981; background: #f0fdf4; }
+        .design-access-badge { background: #6366f1; color: white; padding: 0.2rem 0.5rem; border-radius: 40px; font-size: 0.6rem; font-weight: 600; margin-left: 0.3rem; }
     </style>
 </head>
 <body>
@@ -913,7 +922,7 @@
         // -------------------- LOGOUT (unchanged) --------------------
         function logout() { if (messagesListener) messagesListener(); if (notificationsListener) notificationsListener(); if (acceptedTasksListener) acceptedTasksListener(); auth.signOut(); window.location.href = 'index.html'; }
 
-        // -------------------- TAB SWITCHING (updated with new cases) --------------------
+        // -------------------- TAB SWITCHING (updated with design tab) --------------------
         function switchTab(tab) {
             currentTab = tab;
             currentTaskViewed = null;
@@ -941,7 +950,9 @@
             });
             switch (tab) {
                 case 'tasks': loadTasks(); break;
-                case 'transcription': case 'design': case 'projects': showNotQualifiedDialog(tab); break;
+                case 'transcription': loadFilteredTasks('transcription'); break;
+                case 'design': loadFilteredTasks('design', 'development'); break; // NEW: show design and development tasks
+                case 'projects': loadFilteredTasks('projects'); break;
                 case 'training': loadTrainings(); break;
                 case 'submissions': loadSubmissions(); break;
                 case 'withdrawals': loadWithdrawals(); break;
@@ -958,165 +969,28 @@
             }
         }
 
-        // -------------------- NOT QUALIFIED DIALOG (unchanged) --------------------
-        function showNotQualifiedDialog(section) { /* unchanged */ showModal(`<div class="modal-content" style="text-align:center;"><div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div><h3 style="color:#ef4444;">Access Restricted</h3><p>You don't qualify for <strong>${section}</strong>.</p><div style="background:#f1f5f9; padding:1rem; border-radius:1rem; margin:1rem 0;"><p>This section requires specific qualifications. Contact admin.</p></div><div style="display:flex; gap:1rem; justify-content:center;"><button class="btn btn-primary" onclick="window.open('https://chat.whatsapp.com/F9ql5QAItJr8iCdpeEdHEu?mode=gi_t','_blank')"><i class="fab fa-whatsapp"></i> Contact Admin</button><button class="btn btn-secondary" onclick="closeModal()">Close</button></div></div>`); }
-
-        // -------------------- HELPER FUNCTIONS (unchanged) --------------------
-        function isDeadlinePassed(deadline) { if (!deadline) return false; const d = deadline.toDate ? deadline.toDate() : new Date(deadline); return new Date() > d; }
-        function formatDeadline(deadline) { if (!deadline) return 'No deadline'; const d = deadline.toDate ? deadline.toDate() : new Date(deadline); const diff = d - new Date(); if (diff < 0) return 'Expired'; const days = Math.ceil(diff / (1000*60*60*24)); if (days > 7) return d.toLocaleDateString(); if (days > 1) return `${days} days left`; if (days === 1) return '1 day left'; return `${Math.ceil(diff / (1000*60*60))} hours left`; }
-        function getDeadlineClass(deadline) { if (!deadline) return ''; const d = deadline.toDate ? deadline.toDate() : new Date(deadline); const diff = d - new Date(); if (diff < 0) return 'expired'; if (diff < 24*60*60*1000) return 'urgent'; return 'upcoming'; }
-
-        // -------------------- AUTH STATE (with login logging, unchanged) --------------------
-        auth.onAuthStateChanged(async (user) => {
-            if (!user) { window.location.href = 'index.html'; return; }
-            const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
-            if (!user.emailVerified && !isGoogle) { window.location.href = 'index.html'; return; }
+        // NEW: load tasks filtered by categories (for design, development, etc.)
+        async function loadFilteredTasks(...categories) {
+            currentTaskViewed = null; refreshMirror();
+            document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading tasks...</p></div>';
             try {
-                const doc = await db.collection('users').doc(user.uid).get();
-                if (!doc.exists) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const referralCode = urlParams.get('ref');
-                    let referredBy = null;
-                    if (referralCode) {
-                        const usersSnapshot = await db.collection('users').get();
-                        for (const u of usersSnapshot.docs) {
-                            if (generateReferralCode(u.id) === referralCode) {
-                                referredBy = u.id;
-                                break;
-                            }
-                        }
+                const snap = await db.collection('tasks').get();
+                if (snap.empty) { document.getElementById('content').innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><h4>No Tasks</h4></div>'; return; }
+                allTasks = [];
+                snap.forEach(doc => { if (doc.data().active) allTasks.push({ id: doc.id, ...doc.data() }); });
+                await Promise.all(allTasks.map(async t => {
+                    if (t.acceptedCount === undefined) t.acceptedCount = 0;
+                    const acceptSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').where('userId', '==', currentUser.uid).get();
+                    t.userAccepted = !acceptSnap.empty;
+                    if (t.collaborable) {
+                        const teamSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').get();
+                        t.team = teamSnap.docs.map(d => d.data().userName || d.data().userEmail || 'User');
                     }
-                    await db.collection('users').doc(user.uid).set({
-                        email: user.email,
-                        displayName: user.displayName || 'User',
-                        phone: '',
-                        role: 'user',
-                        wallet: 0,
-                        active: true,
-                        verified: user.emailVerified || isGoogle,
-                        frozen: false,
-                        membershipType: MEMBERSHIP_TYPES.BASIC,
-                        membershipPaid: false,
-                        membershipStatus: 'active',
-                        membershipExpiry: null,
-                        totalFeesPaid: 0,
-                        unreadMessages: 0,
-                        referredBy: referredBy,
-                        totalReferrals: 0,
-                        referralEarnings: 0,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    if (referredBy) {
-                        await db.collection('referrals').add({
-                            referrerId: referredBy,
-                            referredId: user.uid,
-                            referredEmail: user.email,
-                            status: 'pending',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-                    const newDoc = await db.collection('users').doc(user.uid).get();
-                    userData = { id: user.uid, ...newDoc.data() };
-                } else {
-                    userData = { id: user.uid, ...doc.data() };
-                    if (userData.frozen === undefined) {
-                        await db.collection('users').doc(user.uid).update({ frozen: false });
-                        userData.frozen = false;
-                    }
-                    const welcomeBonus = getWelcomeBonus(MEMBERSHIP_TYPES.ELITE);
-                    if (userData.membershipType === MEMBERSHIP_TYPES.ELITE && !userData.eliteBonusApplied) {
-                        await db.collection('users').doc(user.uid).update({
-                            wallet: firebase.firestore.FieldValue.increment(welcomeBonus),
-                            eliteBonusApplied: true
-                        });
-                        userData.wallet = (userData.wallet || 0) + welcomeBonus;
-                    }
-                }
-                if (userData.active === false) { await auth.signOut(); window.location.href = 'index.html'; return; }
-                currentUser = user;
-                document.getElementById('userName').textContent = userData.displayName;
-                updateWalletDisplay();
-
-                // Record login
-                try {
-                    await db.collection('userLogins').add({
-                        userId: currentUser.uid,
-                        userName: userData.displayName,
-                        userEmail: userData.email,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        ip: null
-                    });
-                } catch (loginError) { console.warn('Failed to record login:', loginError); }
-
-                await loadConversionRate(); // load USD/KSH rate
-                await loadFeeSettings(); 
-                await loadMembershipPackages();
-                await loadWithdrawalSettings();
-                await loadPaymentSettings();
-                setupMessageCounter(); setupWalletListener(); setupNotificationsListener();
-                setupAcceptedTasksListener(); // NEW: listen to accepted tasks count
-                loadDashboard();
-                refreshMirror();
-            } catch (error) {
-                console.error('Auth error:', error);
-                showAlert('Error loading user data: ' + error.message, 'error');
-            }
-        });
-
-        function updateWalletDisplay() {
-            document.getElementById('walletDisplay').textContent = formatBoth(userData?.wallet || 0);
-        }
-
-        // -------------------- LISTENERS (unchanged) --------------------
-        function setupMessageCounter() { if (messagesListener) messagesListener(); messagesListener = db.collection('messages').where('recipientId','==',currentUser.uid).where('fromAdmin','==',true).where('read','==',false).onSnapshot(snap => { const cnt = snap.size; ['unreadMessagesBadge','mobileMessagesBadge','bottomMessagesBadge'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = cnt; el.style.display = cnt ? 'inline' : 'none'; } }); db.collection('users').doc(currentUser.uid).update({ unreadMessages: cnt }).catch(console.log); refreshMirror(); }, err => { console.error('Message counter error:', err); setTimeout(setupMessageCounter,5000); }); }
-        function setupWalletListener() { db.collection('users').doc(currentUser.uid).onSnapshot(doc => { if (doc.exists) { userData.wallet = doc.data().wallet || 0; updateWalletDisplay(); refreshMirror(); } }, console.error); }
-        function setupNotificationsListener() { if (notificationsListener) notificationsListener(); notificationsListener = db.collection('notifications').where('userId','==',currentUser.uid).onSnapshot(snap => { const unread = snap.docs.filter(d => !d.data().read).length; ['notificationBadge','unreadNotifBadge','mobileNotifBadge'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = unread; el.style.display = unread ? 'inline' : 'none'; } }); if (notificationsPanelVisible) { const recent = snap.docs.slice(0,20); renderNotificationsPanel(recent); } refreshMirror(); }, console.error); }
-
-        // NEW: Listener for accepted tasks count (for Submit badges)
-        function setupAcceptedTasksListener() {
-            if (acceptedTasksListener) acceptedTasksListener();
-            acceptedTasksListener = db.collection('users').doc(currentUser.uid).collection('acceptedTasks').onSnapshot(snap => {
-                const count = snap.size;
-                ['desktopSubmitBadge', 'mobileSubmitBadge', 'bottomSubmitBadge'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        el.textContent = count;
-                        el.style.display = count ? 'inline' : 'none';
-                    }
-                });
-                refreshMirror();
-            }, console.error);
-        }
-
-        // -------------------- LOAD DASHBOARD (added productivity score) --------------------
-        async function loadDashboard() {
-            try {
-                const userDoc = await db.collection('users').doc(currentUser.uid).get();
-                userData.wallet = userDoc.data().wallet || 0;
-                const pendingSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','pending').get();
-                const approvedSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','approved').get();
-                const rejectedSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','rejected').get();
-                
-                const totalSubmissions = pendingSnap.size + approvedSnap.size + rejectedSnap.size;
-                let activityRate = '0%';
-                if (totalSubmissions > 0) {
-                    activityRate = Math.round((approvedSnap.size / totalSubmissions) * 100) + '%';
-                }
-                userData.activityRate = activityRate;
-
-                // Productivity score: simple formula: (approved * 10) + (wallet * 2) - (rejected * 5)
-                const productivityScore = (approvedSnap.size * 10) + (userData.wallet * 2) - (rejectedSnap.size * 5);
-                userData.productivityScore = Math.max(0, Math.round(productivityScore));
-                
-                document.getElementById('statsGrid').innerHTML = `
-                    <div class="stat-card"><i class="fas fa-wallet"></i><div class="stat-value">${formatBoth(userData.wallet)}</div><div class="stat-label">Balance</div></div>
-                    <div class="stat-card"><i class="fas fa-clock"></i><div class="stat-value">${pendingSnap.size}</div><div class="stat-label">Pending</div></div>
-                    <div class="stat-card"><i class="fas fa-check-circle"></i><div class="stat-value">${approvedSnap.size}</div><div class="stat-label">Approved</div></div>
-                    <div class="stat-card"><i class="fas fa-chart-line"></i><div class="stat-value">${activityRate}</div><div class="stat-label">Activity Rate</div></div>
-                    <div class="stat-card"><i class="fas fa-star"></i><div class="stat-value">${userData.productivityScore}</div><div class="stat-label">Productivity</div></div>
-                `;
-                switchTab('tasks');
-            } catch (e) { console.error('Dashboard error:', e); switchTab('tasks'); }
+                }));
+                // Filter by categories
+                filteredTasks = allTasks.filter(t => categories.includes(t.category));
+                renderTasks();
+            } catch (e) { document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadTasks()">Retry</button></div>`; }
         }
 
         // -------------------- TASKS (modified for collaboration) --------------------
@@ -1133,7 +1007,6 @@
                     if (t.acceptedCount === undefined) t.acceptedCount = 0;
                     const acceptSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').where('userId', '==', currentUser.uid).get();
                     t.userAccepted = !acceptSnap.empty;
-                    // For collaborable tasks, fetch team list
                     if (t.collaborable) {
                         const teamSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').get();
                         t.team = teamSnap.docs.map(d => d.data().userName || d.data().userEmail || 'User');
@@ -1152,7 +1025,6 @@
                 for (let t of filteredTasks) {
                     const submitted = await hasUserSubmitted(t.id);
                     const expired = isDeadlinePassed(t.deadline);
-                    // For collaborable tasks, allow more than 2 (set maxCollaborators from task or default 5)
                     const maxCollab = t.collaborable ? (t.maxCollaborators || 5) : 2;
                     const acceptDisabled = t.userAccepted || (t.acceptedCount >= maxCollab) || expired;
                     let acceptButton;
@@ -1293,6 +1165,8 @@
                     loadTasks();
                 } else if (currentTab === 'submit') {
                     loadPendingSubmissions();
+                } else if (currentTab === 'design' || currentTab === 'transcription' || currentTab === 'projects') {
+                    loadFilteredTasks(currentTab === 'design' ? 'design' : currentTab === 'transcription' ? 'transcription' : 'projects');
                 }
                 
                 // Show the submission form
@@ -1309,7 +1183,62 @@
 
         async function viewTaskDetails(taskId) { /* unchanged */ try { const doc = await db.collection('tasks').doc(taskId).get(); if (!doc.exists) { showAlert('Task not found','error'); return; } const task = { id: taskId, ...doc.data() }; currentTaskViewed = task; refreshMirror(); showModal(`<div class="pdf-document"><div class="pdf-header"><div><h2>Task Details</h2></div><span class="pdf-badge">#${taskId.substring(0,8)}</span></div><div class="pdf-content"><div class="pdf-title">${escapeHtml(task.title)}</div><div class="pdf-grid"><div class="pdf-grid-item"><span class="pdf-grid-label">Client</span><span class="pdf-grid-value"><i class="fas fa-user-circle"></i> ${escapeHtml(task.clientName||'Admin')}</span></div><div class="pdf-grid-item"><span class="pdf-grid-label">Reward</span><span class="pdf-grid-value"><i class="fas fa-dollar-sign"></i> ${formatBoth(parseFloat(task.reward)||0)}</span></div></div><div class="pdf-section"><div class="pdf-section-title"><i class="fas fa-align-left"></i> Description</div><div class="pdf-section-content">${escapeHtml(task.description||'No description')}</div></div><div class="pdf-section"><div class="pdf-section-title"><i class="fas fa-clipboard-list"></i> Instructions</div><div class="pdf-section-content">${escapeHtml(task.instructions||'No instructions')}</div></div><div class="pdf-actions"><button class="pdf-btn pdf-btn-primary" onclick="acceptTask('${taskId}')"><i class="fas fa-check-circle"></i> Accept Task</button><button class="pdf-btn pdf-btn-secondary" onclick="closeModal()"><i class="fas fa-times"></i> Close</button></div></div></div>`); } catch (e) { showAlert('Error loading task details','error'); } }
 
-        // ===== UPDATED showSubmitForm FUNCTION (with live countdown, upload simulation, and draft loading) =====
+        // ===== NEW: DESIGN ACCESS FUNCTIONS =====
+        // Check if user has design access (either membership elite or designAccess flag)
+        function hasDesignAccess() {
+            return userData.membershipType === MEMBERSHIP_TYPES.ELITE || userData.designAccess === true;
+        }
+
+        // Show upgrade prompt for design tasks (cost $5)
+        function showDesignUpgradePrompt(taskId) {
+            showModal(`
+                <div class="modal-content" style="text-align:center;">
+                    <i class="fas fa-pencil-ruler" style="font-size:4rem; color:#f59e0b;"></i>
+                    <h3>Unlock Design Tasks</h3>
+                    <p>To submit design tasks, you need to pay a one-time fee of <strong>$${5}</strong>.</p>
+                    <p>Click the button below to pay (opens in new tab). After payment, enter the transaction code.</p>
+                    <a href="${paymentUrl}" target="_blank" class="btn btn-warning" style="display:inline-block; margin-bottom:1rem;">Pay $5 now</a>
+                    <input type="text" id="transactionCode" class="smart-input" placeholder="Transaction code">
+                    <textarea id="paymentNotes" class="smart-textarea" placeholder="Additional notes (optional)"></textarea>
+                    <div style="display:flex; gap:1rem; margin-top:1rem;">
+                        <button class="btn btn-success" onclick="submitDesignPayment('${taskId}')">Submit Payment</button>
+                        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        // Submit design payment for approval
+        async function submitDesignPayment(taskId) {
+            const txCode = document.getElementById('transactionCode')?.value;
+            if (!txCode) { showAlert('Please enter the transaction code', 'error'); return; }
+            try {
+                showModal(`<div class="modal-content"><div class="loading-spinner"></div><h3>Submitting...</h3></div>`);
+                await db.collection('designPayments').add({
+                    userId: currentUser.uid,
+                    userName: userData.displayName,
+                    userEmail: currentUser.email,
+                    transactionCode: txCode,
+                    amount: 5,
+                    notes: document.getElementById('paymentNotes')?.value || '',
+                    status: 'pending',
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showModal(`
+                    <div class="modal-content" style="text-align:center;">
+                        <div class="success-check"><i class="fas fa-check"></i></div>
+                        <h3 style="color:#10b981;">Payment Submitted</h3>
+                        <p>Your payment is being verified. You'll be able to submit design tasks once approved.</p>
+                        <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                    </div>
+                `);
+            } catch (e) {
+                console.error('Error submitting design payment:', e);
+                showAlert('Error submitting payment. Please try again.', 'error');
+            }
+        }
+
+        // ===== UPDATED showSubmitForm FUNCTION (with design link and access check) =====
         async function showSubmitForm(taskId, existingWork = '') {
             try {
                 const taskDoc = await db.collection('tasks').doc(taskId).get();
@@ -1322,12 +1251,23 @@
                     showModal(`<div class="modal-content"><i class="fas fa-exclamation-circle" style="font-size:4rem; color:#ef4444;"></i><h3>Already Submitted</h3><button class="btn btn-primary" onclick="closeModal()">Close</button></div>`);
                     return;
                 }
+
+                // Check design access for design/development tasks
+                if ((task.category === 'design' || task.category === 'development') && !hasDesignAccess()) {
+                    showDesignUpgradePrompt(taskId);
+                    return;
+                }
+
                 sessionStorage.removeItem('pendingSubmission');
                 const deadline = task.deadline ? task.deadline.toDate() : null;
                 // Load draft from localStorage if exists
                 const draftKey = `draft_${taskId}`;
                 const savedDraft = localStorage.getItem(draftKey) || '';
                 const workToShow = savedDraft || existingWork;
+
+                // Determine if design task to show URL input
+                const isDesignTask = task.category === 'design' || task.category === 'development';
+
                 showModal(`
                     <div class="modal-content" style="padding:0; overflow:hidden; max-width:800px;">
                         <div class="smart-submission">
@@ -1351,6 +1291,12 @@
                                         <span class="word-counter" id="wordCounter">0 / 20 words</span>
                                     </div>
                                     <textarea id="workText" class="smart-textarea" placeholder="Paste your work here..." oninput="updateWordCount(); saveDraft('${taskId}', this.value)">${escapeHtml(workToShow)}</textarea>
+                                    ${isDesignTask ? `
+                                        <div class="url-input-container">
+                                            <div class="url-input-label"><i class="fas fa-link"></i> Design Link (URL) <span class="design-access-badge">Required for design tasks</span></div>
+                                            <input type="url" id="designLink" class="url-input" placeholder="https://your-design-link.com" oninput="validateUrl(this)">
+                                        </div>
+                                    ` : ''}
                                     <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
                                         <button id="uploadBtn" class="btn btn-secondary" style="flex:1;"><i class="fas fa-upload"></i> Upload File</button>
                                         <button class="btn btn-preview" onclick="previewSubmission('${taskId}')" style="flex:1;"><i class="fas fa-eye"></i> Preview</button>
@@ -1399,12 +1345,29 @@
                         setTimeout(() => {
                             this.innerHTML = originalHTML;
                             this.disabled = false;
-                            showAlert('Failed to upload. Please paste your work instead.', 'error');
+                            showAlert('Failed to upload. Please paste your work or design link instead.', 'error');
                         }, 2000);
                     });
                 }
             } catch (e) {
                 showAlert('Error preparing form', 'error');
+            }
+        }
+
+        // Validate URL input (simple)
+        function validateUrl(input) {
+            const url = input.value.trim();
+            if (url === '') {
+                input.classList.remove('valid', 'invalid');
+                return;
+            }
+            try {
+                new URL(url);
+                input.classList.add('valid');
+                input.classList.remove('invalid');
+            } catch (e) {
+                input.classList.add('invalid');
+                input.classList.remove('valid');
             }
         }
 
@@ -1418,11 +1381,34 @@
 
         function updateWordCount() { /* unchanged */ const ta = document.getElementById('workText'); if (!ta) return; const wc = ta.value.trim().split(/\s+/).filter(w => w.length>0).length; const counter = document.getElementById('wordCounter'); if (counter) { counter.textContent = `${wc} / 20 words`; counter.className = 'word-counter' + (wc >= 20 ? ' valid' : ' warning'); ta.classList.toggle('valid', wc >= 20); ta.classList.toggle('invalid', wc < 20); } }
 
-        async function previewSubmission(taskId) { /* unchanged */ const work = document.getElementById('workText').value; const wc = work.trim().split(/\s+/).filter(w => w.length>0).length; if (wc < 20) { showAlert(`Please provide at least 20 words (current: ${wc})`, 'error'); return; } try { const taskDoc = await db.collection('tasks').doc(taskId).get(); const task = taskDoc.data(); sessionStorage.setItem('pendingSubmission', JSON.stringify({ taskId, work, wc })); showModal(`<div class="modal-content" style="max-width:700px;"><div style="background:linear-gradient(135deg,#6366f1,#8b5cf6); padding:2rem; color:white; border-radius:1rem 1rem 0 0; margin:-2rem -2rem 1.5rem -2rem;"><h3 style="font-size:1.5rem;">Preview Your Submission</h3><p>${escapeHtml(task.title)}</p><div style="display:flex; gap:1rem; margin-top:1rem;"><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-user-circle"></i> ${escapeHtml(task.clientName||'Admin')}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-tag"></i> ${formatBoth(parseFloat(task.reward)||0)}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-file-word"></i> ${wc} words</span></div></div><div style="margin-bottom:1.5rem;"><h4><i class="fas fa-pencil-alt" style="color:#6366f1;"></i> Your Work:</h4><div style="background:#f8fafc; padding:1.5rem; border-left:4px solid #6366f1; max-height:300px; overflow-y:auto;">${work.replace(/\n/g,'<br>')}</div></div><div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:1rem; border-radius:0.5rem; margin-bottom:1.5rem;"><i class="fas fa-info-circle" style="color:#f59e0b;"></i> Please review carefully. Once submitted, you cannot edit.</div><div style="display:flex; gap:1rem;"><button class="btn btn-success" onclick="saveSubmission('${taskId}')">Confirm & Submit</button><button class="btn btn-primary" onclick="showSubmitForm('${taskId}', ${JSON.stringify(work)})">Edit</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button></div></div>`); } catch (e) { showAlert('Error previewing','error'); } }
+        async function previewSubmission(taskId) {
+            const work = document.getElementById('workText').value;
+            const wc = work.trim().split(/\s+/).filter(w => w.length>0).length;
+            if (wc < 20) { showAlert(`Please provide at least 20 words (current: ${wc})`, 'error'); return; }
+            const taskDoc = await db.collection('tasks').doc(taskId).get();
+            const task = taskDoc.data();
+            const isDesignTask = task.category === 'design' || task.category === 'development';
+            let designLink = '';
+            if (isDesignTask) {
+                designLink = document.getElementById('designLink')?.value.trim() || '';
+                if (!designLink) {
+                    showAlert('Please provide a design link (URL)', 'error');
+                    return;
+                }
+                try {
+                    new URL(designLink);
+                } catch (e) {
+                    showAlert('Please enter a valid URL (e.g., https://... )', 'error');
+                    return;
+                }
+            }
+            sessionStorage.setItem('pendingSubmission', JSON.stringify({ taskId, work, wc, designLink }));
+            showModal(`<div class="modal-content" style="max-width:700px;"><div style="background:linear-gradient(135deg,#6366f1,#8b5cf6); padding:2rem; color:white; border-radius:1rem 1rem 0 0; margin:-2rem -2rem 1.5rem -2rem;"><h3 style="font-size:1.5rem;">Preview Your Submission</h3><p>${escapeHtml(task.title)}</p><div style="display:flex; gap:1rem; margin-top:1rem;"><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-user-circle"></i> ${escapeHtml(task.clientName||'Admin')}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-tag"></i> ${formatBoth(parseFloat(task.reward)||0)}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-file-word"></i> ${wc} words</span></div></div><div style="margin-bottom:1.5rem;"><h4><i class="fas fa-pencil-alt" style="color:#6366f1;"></i> Your Work:</h4><div style="background:#f8fafc; padding:1.5rem; border-left:4px solid #6366f1; max-height:300px; overflow-y:auto;">${work.replace(/\n/g,'<br>')}</div></div>${isDesignTask ? `<div style="margin-bottom:1.5rem;"><h4><i class="fas fa-link" style="color:#6366f1;"></i> Design Link:</h4><div style="background:#f8fafc; padding:1rem; border-left:4px solid #10b981;"><a href="${designLink}" target="_blank">${designLink}</a></div></div>` : ''}<div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:1rem; border-radius:0.5rem; margin-bottom:1.5rem;"><i class="fas fa-info-circle" style="color:#f59e0b;"></i> Please review carefully. Once submitted, you cannot edit.</div><div style="display:flex; gap:1rem;"><button class="btn btn-success" onclick="saveSubmission('${taskId}')">Confirm & Submit</button><button class="btn btn-primary" onclick="showSubmitForm('${taskId}', ${JSON.stringify(work)})">Edit</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button></div></div>`);
+        }
 
-        // ===== IMPROVED saveSubmission FUNCTION (handles sessionStorage safely) =====
+        // ===== IMPROVED saveSubmission FUNCTION (handles sessionStorage safely and designLink) =====
         async function saveSubmission(taskId) {
-            let work = null;
+            let work = null, designLink = null;
 
             // Safely retrieve pending submission from sessionStorage
             try {
@@ -1431,6 +1417,7 @@
                     const data = JSON.parse(pending);
                     if (data && data.taskId === taskId) {
                         work = data.work;
+                        designLink = data.designLink || null;
                     }
                 }
             } catch (e) {
@@ -1442,6 +1429,8 @@
             if (!work) {
                 const textarea = document.getElementById('workText');
                 if (textarea) work = textarea.value;
+                const linkInput = document.getElementById('designLink');
+                if (linkInput) designLink = linkInput.value.trim() || null;
             }
 
             if (!work) {
@@ -1483,8 +1472,8 @@
                     </div>
                 `);
 
-                // Save submission to Firestore
-                await db.collection('submissions').add({
+                // Prepare submission data
+                const submissionData = {
                     userId: currentUser.uid,
                     userEmail: currentUser.email,
                     taskId: taskId,
@@ -1493,7 +1482,13 @@
                     status: 'pending',
                     wordCount: wc,
                     submittedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
+                if (designLink) {
+                    submissionData.designLink = designLink;
+                }
+
+                // Save submission to Firestore
+                await db.collection('submissions').add(submissionData);
 
                 // Remove from acceptedTasks and delete draft
                 await db.collection('users').doc(currentUser.uid).collection('acceptedTasks').doc(taskId).delete();
@@ -1569,6 +1564,13 @@
                                     ${sub.wordCount ? `<span><i class="fas fa-file-word"></i> ${sub.wordCount} words</span>` : ''}
                                     ${earned ? `<span><i class="fas fa-dollar-sign"></i> ${earned}</span>` : ''}
                                 </div>
+                                
+                                ${sub.designLink ? `
+                                    <div style="background:#f0f9ff; padding:0.5rem; border-radius:0.5rem; margin-bottom:0.5rem;">
+                                        <strong style="font-size:0.7rem;">Design Link:</strong>
+                                        <a href="${escapeHtml(sub.designLink)}" target="_blank" style="display:block; font-size:0.75rem; word-break:break-all;">${escapeHtml(sub.designLink)}</a>
+                                    </div>
+                                ` : ''}
                                 
                                 ${sub.review ? `
                                     <div style="background:#f1f5f9; padding:0.8rem; border-radius:0.5rem; margin-top:0.5rem;">
@@ -2090,6 +2092,165 @@
             } catch (e) {
                 document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p></div>`;
             }
+        }
+
+        // -------------------- AUTH STATE (with login logging and designAccess) --------------------
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) { window.location.href = 'index.html'; return; }
+            const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
+            if (!user.emailVerified && !isGoogle) { window.location.href = 'index.html'; return; }
+            try {
+                const doc = await db.collection('users').doc(user.uid).get();
+                if (!doc.exists) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const referralCode = urlParams.get('ref');
+                    let referredBy = null;
+                    if (referralCode) {
+                        const usersSnapshot = await db.collection('users').get();
+                        for (const u of usersSnapshot.docs) {
+                            if (generateReferralCode(u.id) === referralCode) {
+                                referredBy = u.id;
+                                break;
+                            }
+                        }
+                    }
+                    await db.collection('users').doc(user.uid).set({
+                        email: user.email,
+                        displayName: user.displayName || 'User',
+                        phone: '',
+                        role: 'user',
+                        wallet: 0,
+                        active: true,
+                        verified: user.emailVerified || isGoogle,
+                        frozen: false,
+                        membershipType: MEMBERSHIP_TYPES.BASIC,
+                        membershipPaid: false,
+                        membershipStatus: 'active',
+                        membershipExpiry: null,
+                        totalFeesPaid: 0,
+                        unreadMessages: 0,
+                        referredBy: referredBy,
+                        totalReferrals: 0,
+                        referralEarnings: 0,
+                        designAccess: false, // NEW: design access flag
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    if (referredBy) {
+                        await db.collection('referrals').add({
+                            referrerId: referredBy,
+                            referredId: user.uid,
+                            referredEmail: user.email,
+                            status: 'pending',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                    const newDoc = await db.collection('users').doc(user.uid).get();
+                    userData = { id: user.uid, ...newDoc.data() };
+                } else {
+                    userData = { id: user.uid, ...doc.data() };
+                    // Ensure designAccess exists
+                    if (userData.designAccess === undefined) {
+                        await db.collection('users').doc(user.uid).update({ designAccess: false });
+                        userData.designAccess = false;
+                    }
+                    if (userData.frozen === undefined) {
+                        await db.collection('users').doc(user.uid).update({ frozen: false });
+                        userData.frozen = false;
+                    }
+                    const welcomeBonus = getWelcomeBonus(MEMBERSHIP_TYPES.ELITE);
+                    if (userData.membershipType === MEMBERSHIP_TYPES.ELITE && !userData.eliteBonusApplied) {
+                        await db.collection('users').doc(user.uid).update({
+                            wallet: firebase.firestore.FieldValue.increment(welcomeBonus),
+                            eliteBonusApplied: true
+                        });
+                        userData.wallet = (userData.wallet || 0) + welcomeBonus;
+                    }
+                }
+                if (userData.active === false) { await auth.signOut(); window.location.href = 'index.html'; return; }
+                currentUser = user;
+                document.getElementById('userName').textContent = userData.displayName;
+                updateWalletDisplay();
+
+                // Record login
+                try {
+                    await db.collection('userLogins').add({
+                        userId: currentUser.uid,
+                        userName: userData.displayName,
+                        userEmail: userData.email,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        ip: null
+                    });
+                } catch (loginError) { console.warn('Failed to record login:', loginError); }
+
+                await loadConversionRate(); // load USD/KSH rate
+                await loadFeeSettings(); 
+                await loadMembershipPackages();
+                await loadWithdrawalSettings();
+                await loadPaymentSettings();
+                setupMessageCounter(); setupWalletListener(); setupNotificationsListener();
+                setupAcceptedTasksListener(); // NEW: listen to accepted tasks count
+                loadDashboard();
+                refreshMirror();
+            } catch (error) {
+                console.error('Auth error:', error);
+                showAlert('Error loading user data: ' + error.message, 'error');
+            }
+        });
+
+        function updateWalletDisplay() {
+            document.getElementById('walletDisplay').textContent = formatBoth(userData?.wallet || 0);
+        }
+
+        // -------------------- LISTENERS (unchanged) --------------------
+        function setupMessageCounter() { if (messagesListener) messagesListener(); messagesListener = db.collection('messages').where('recipientId','==',currentUser.uid).where('fromAdmin','==',true).where('read','==',false).onSnapshot(snap => { const cnt = snap.size; ['unreadMessagesBadge','mobileMessagesBadge','bottomMessagesBadge'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = cnt; el.style.display = cnt ? 'inline' : 'none'; } }); db.collection('users').doc(currentUser.uid).update({ unreadMessages: cnt }).catch(console.log); refreshMirror(); }, err => { console.error('Message counter error:', err); setTimeout(setupMessageCounter,5000); }); }
+        function setupWalletListener() { db.collection('users').doc(currentUser.uid).onSnapshot(doc => { if (doc.exists) { userData.wallet = doc.data().wallet || 0; updateWalletDisplay(); refreshMirror(); } }, console.error); }
+        function setupNotificationsListener() { if (notificationsListener) notificationsListener(); notificationsListener = db.collection('notifications').where('userId','==',currentUser.uid).onSnapshot(snap => { const unread = snap.docs.filter(d => !d.data().read).length; ['notificationBadge','unreadNotifBadge','mobileNotifBadge'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = unread; el.style.display = unread ? 'inline' : 'none'; } }); if (notificationsPanelVisible) { const recent = snap.docs.slice(0,20); renderNotificationsPanel(recent); } refreshMirror(); }, console.error); }
+
+        // NEW: Listener for accepted tasks count (for Submit badges)
+        function setupAcceptedTasksListener() {
+            if (acceptedTasksListener) acceptedTasksListener();
+            acceptedTasksListener = db.collection('users').doc(currentUser.uid).collection('acceptedTasks').onSnapshot(snap => {
+                const count = snap.size;
+                ['desktopSubmitBadge', 'mobileSubmitBadge', 'bottomSubmitBadge'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.textContent = count;
+                        el.style.display = count ? 'inline' : 'none';
+                    }
+                });
+                refreshMirror();
+            }, console.error);
+        }
+
+        // -------------------- LOAD DASHBOARD (added productivity score) --------------------
+        async function loadDashboard() {
+            try {
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                userData.wallet = userDoc.data().wallet || 0;
+                const pendingSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','pending').get();
+                const approvedSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','approved').get();
+                const rejectedSnap = await db.collection('submissions').where('userId','==',currentUser.uid).where('status','==','rejected').get();
+                
+                const totalSubmissions = pendingSnap.size + approvedSnap.size + rejectedSnap.size;
+                let activityRate = '0%';
+                if (totalSubmissions > 0) {
+                    activityRate = Math.round((approvedSnap.size / totalSubmissions) * 100) + '%';
+                }
+                userData.activityRate = activityRate;
+
+                // Productivity score: simple formula: (approved * 10) + (wallet * 2) - (rejected * 5)
+                const productivityScore = (approvedSnap.size * 10) + (userData.wallet * 2) - (rejectedSnap.size * 5);
+                userData.productivityScore = Math.max(0, Math.round(productivityScore));
+                
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card"><i class="fas fa-wallet"></i><div class="stat-value">${formatBoth(userData.wallet)}</div><div class="stat-label">Balance</div></div>
+                    <div class="stat-card"><i class="fas fa-clock"></i><div class="stat-value">${pendingSnap.size}</div><div class="stat-label">Pending</div></div>
+                    <div class="stat-card"><i class="fas fa-check-circle"></i><div class="stat-value">${approvedSnap.size}</div><div class="stat-label">Approved</div></div>
+                    <div class="stat-card"><i class="fas fa-chart-line"></i><div class="stat-value">${activityRate}</div><div class="stat-label">Activity Rate</div></div>
+                    <div class="stat-card"><i class="fas fa-star"></i><div class="stat-value">${userData.productivityScore}</div><div class="stat-label">Productivity</div></div>
+                `;
+                switchTab('tasks');
+            } catch (e) { console.error('Dashboard error:', e); switchTab('tasks'); }
         }
     </script>
 </body>
