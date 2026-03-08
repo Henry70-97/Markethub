@@ -974,47 +974,90 @@
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading tasks...</p></div>';
             try {
-                const snap = await db.collection('tasks').get();
-                if (snap.empty) { document.getElementById('content').innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><h4>No Tasks</h4></div>'; return; }
-                allTasks = [];
-                snap.forEach(doc => { if (doc.data().active) allTasks.push({ id: doc.id, ...doc.data() }); });
+                // Fetch all active tasks
+                const tasksSnap = await db.collection('tasks').where('active', '==', true).get();
+                if (tasksSnap.empty) { 
+                    document.getElementById('content').innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><h4>No Tasks</h4></div>'; 
+                    return; 
+                }
+
+                // Fetch user's accepted tasks and submissions once for performance
+                const [acceptedSnap, submissionsSnap] = await Promise.all([
+                    db.collection('users').doc(currentUser.uid).collection('acceptedTasks').get(),
+                    db.collection('submissions').where('userId', '==', currentUser.uid).get()
+                ]);
+                const acceptedTaskIds = new Set(acceptedSnap.docs.map(doc => doc.id));
+                const submittedTaskIds = new Set(submissionsSnap.docs.map(doc => doc.data().taskId));
+
+                // Build tasks array with acceptance info
+                allTasks = tasksSnap.docs.map(doc => {
+                    const task = { id: doc.id, ...doc.data() };
+                    task.userAccepted = acceptedTaskIds.has(task.id);
+                    task.userSubmitted = submittedTaskIds.has(task.id);
+                    task.acceptedCount = task.acceptedCount || 0;
+                    return task;
+                });
+
+                // For collaborable tasks, fetch team counts (could be batched, but for now keep as is)
                 await Promise.all(allTasks.map(async t => {
-                    if (t.acceptedCount === undefined) t.acceptedCount = 0;
-                    const acceptSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').where('userId', '==', currentUser.uid).get();
-                    t.userAccepted = !acceptSnap.empty;
                     if (t.collaborable) {
                         const teamSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').get();
                         t.team = teamSnap.docs.map(d => d.data().userName || d.data().userEmail || 'User');
                     }
                 }));
+
                 // Filter by categories
                 filteredTasks = allTasks.filter(t => categories.includes(t.category));
                 renderTasks();
-            } catch (e) { document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadTasks()">Retry</button></div>`; }
+            } catch (e) { 
+                console.error('Error loading filtered tasks:', e);
+                document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadTasks()">Retry</button></div>`; 
+            }
         }
 
-        // -------------------- TASKS (modified for collaboration) --------------------
+        // -------------------- TASKS (modified for collaboration and optimized) --------------------
         let allTasks = [], filteredTasks = [], currentFilters = { category:'all', deadline:'all', amount:'all', difficulty:'all', sortBy:'newest' };
         async function loadTasks() {
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading tasks...</p></div>';
             try {
-                const snap = await db.collection('tasks').get();
-                if (snap.empty) { document.getElementById('content').innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><h4>No Tasks</h4></div>'; return; }
-                allTasks = [];
-                snap.forEach(doc => { if (doc.data().active) allTasks.push({ id: doc.id, ...doc.data() }); });
+                // Fetch all active tasks
+                const tasksSnap = await db.collection('tasks').where('active', '==', true).get();
+                if (tasksSnap.empty) { 
+                    document.getElementById('content').innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><h4>No Tasks</h4></div>'; 
+                    return; 
+                }
+
+                // Fetch user's accepted tasks and submissions once
+                const [acceptedSnap, submissionsSnap] = await Promise.all([
+                    db.collection('users').doc(currentUser.uid).collection('acceptedTasks').get(),
+                    db.collection('submissions').where('userId', '==', currentUser.uid).get()
+                ]);
+                const acceptedTaskIds = new Set(acceptedSnap.docs.map(doc => doc.id));
+                const submittedTaskIds = new Set(submissionsSnap.docs.map(doc => doc.data().taskId));
+
+                allTasks = tasksSnap.docs.map(doc => {
+                    const task = { id: doc.id, ...doc.data() };
+                    task.userAccepted = acceptedTaskIds.has(task.id);
+                    task.userSubmitted = submittedTaskIds.has(task.id);
+                    task.acceptedCount = task.acceptedCount || 0;
+                    return task;
+                });
+
+                // For collaborable tasks, fetch team members (could be optimized but keep for now)
                 await Promise.all(allTasks.map(async t => {
-                    if (t.acceptedCount === undefined) t.acceptedCount = 0;
-                    const acceptSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').where('userId', '==', currentUser.uid).get();
-                    t.userAccepted = !acceptSnap.empty;
                     if (t.collaborable) {
                         const teamSnap = await db.collection('tasks').doc(t.id).collection('taskAccepts').get();
                         t.team = teamSnap.docs.map(d => d.data().userName || d.data().userEmail || 'User');
                     }
                 }));
+
                 filteredTasks = [...allTasks];
                 renderTasks();
-            } catch (e) { document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadTasks()">Retry</button></div>`; }
+            } catch (e) { 
+                console.error('Error loading tasks:', e);
+                document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadTasks()">Retry</button></div>`; 
+            }
         }
 
         async function renderTasks() {
@@ -1023,10 +1066,10 @@
             else {
                 html += `<div class="task-count">Found ${filteredTasks.length} task(s)</div><div class="task-grid">`;
                 for (let t of filteredTasks) {
-                    const submitted = await hasUserSubmitted(t.id);
+                    const submitted = t.userSubmitted; // now from pre-fetched set
                     const expired = isDeadlinePassed(t.deadline);
                     const maxCollab = t.collaborable ? (t.maxCollaborators || 5) : 2;
-                    const acceptDisabled = t.userAccepted || (t.acceptedCount >= maxCollab) || expired;
+                    const acceptDisabled = t.userAccepted || (t.acceptedCount >= maxCollab) || expired || submitted;
                     let acceptButton;
                     if (submitted) {
                         acceptButton = '<button class="btn btn-success" disabled>Completed</button>';
@@ -1068,7 +1111,11 @@
         function updateActiveFilters() { /* unchanged */ const container = document.getElementById('activeFilters'); if (!container) return; let html = ''; if (currentFilters.category !== 'all') html += `<span class="filter-tag">Category: ${currentFilters.category} <i class="fas fa-times" onclick="removeFilter('category')"></i></span>`; if (currentFilters.deadline !== 'all') { let text = currentFilters.deadline === 'urgent' ? 'Urgent (<1d)' : currentFilters.deadline === 'week' ? 'This Week' : 'Expired'; html += `<span class="filter-tag">Deadline: ${text} <i class="fas fa-times" onclick="removeFilter('deadline')"></i></span>`; } if (currentFilters.amount !== 'all') html += `<span class="filter-tag">Amount: $${currentFilters.amount} <i class="fas fa-times" onclick="removeFilter('amount')"></i></span>`; if (currentFilters.difficulty !== 'all') html += `<span class="filter-tag">Level: ${currentFilters.difficulty} <i class="fas fa-times" onclick="removeFilter('difficulty')"></i></span>`; container.innerHTML = html; }
         function removeFilter(filterName) { currentFilters[filterName] = 'all'; const selectMap = { category:'categoryFilter', deadline:'deadlineFilter', amount:'amountFilter', difficulty:'difficultyFilter' }; if (selectMap[filterName]) { const el = document.getElementById(selectMap[filterName]); if (el) el.value = 'all'; } applyFilters(); }
 
-        async function hasUserSubmitted(taskId) { const snap = await db.collection('submissions').where('userId','==',currentUser.uid).where('taskId','==',taskId).get(); return !snap.empty; }
+        // No longer needed per-task because we pre-fetched, but keep for backward compatibility
+        async function hasUserSubmitted(taskId) { 
+            const snap = await db.collection('submissions').where('userId','==',currentUser.uid).where('taskId','==',taskId).get(); 
+            return !snap.empty; 
+        }
 
         // ===== UPDATED acceptTask FUNCTION - Works without index errors =====
         async function acceptTask(taskId) {
