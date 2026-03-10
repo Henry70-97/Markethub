@@ -1224,16 +1224,17 @@
                 `;
 
                 for (let t of filteredTasks) {
-                    // Fallback fields (adjust according to your Firestore structure)
+                    // Fallback fields with multiple possible names
                     const createdDate = t.createdAt?.toDate?.() || new Date();
                     const dateStr = createdDate.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
                     const timeStr = createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    const language = t.language || 'English (USA)';
-                    const provider = t.provider || 'aws';
-                    const taskStatus = t.taskStatus || 'Pending';      // you can set this in Firestore or derive
-                    const duration = t.audioDuration || '00:20:00';
-                    const format = t.audioFormat || 'mp3';
-                    const size = t.audioSize || '13.37 MB';
+                    
+                    const language = t.language || t.lang || 'English (USA)';
+                    const provider = t.provider || t.transcriptionProvider || 'aws';
+                    const taskStatus = t.taskStatus || t.status || 'Pending';
+                    const duration = t.audioDuration || t.duration || '00:20:00';
+                    const format = t.audioFormat || t.format || 'mp3';
+                    const size = t.audioSize || t.size || '13.37 MB';
                     const amount = formatBoth(parseFloat(t.reward) || 0);
 
                     // Check if user already accepted / task full / expired
@@ -1395,7 +1396,7 @@
                 currentTaskViewed = task;
                 refreshMirror();
 
-                // Build modal HTML
+                // Build modal HTML – waveform container with a placeholder
                 let audioHtml = '';
                 if (task.category === 'transcription' && task.audioUrl) {
                     audioHtml = `
@@ -1405,56 +1406,11 @@
                                 <div id="waveform" style="width:100%; height:128px; background:#f1f5f9; border-radius:0.5rem;"></div>
                                 <div style="display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center;">
                                     <button id="playPauseBtn" class="btn btn-sm btn-primary"><i class="fas fa-play"></i> Play</button>
-                                    <span id="currentTime">00:00</span> / <span id="totalTime">${task.audioDuration || '00:00'}</span>
+                                    <span id="currentTime">00:00</span> / <span id="totalTime">${task.audioDuration || task.duration || '00:00'}</span>
                                     <a href="${task.audioUrl}" target="_blank" class="btn btn-sm btn-secondary" style="margin-left:auto;"><i class="fas fa-download"></i> Download</a>
                                 </div>
                             </div>
                         </div>
-                        <script>
-                            // Initialize wavesurfer when modal is loaded
-                            (function() {
-                                const wavesurfer = WaveSurfer.create({
-                                    container: '#waveform',
-                                    waveColor: '#6366f1',
-                                    progressColor: '#10b981',
-                                    cursorColor: '#475569',
-                                    barWidth: 2,
-                                    barRadius: 3,
-                                    height: 128,
-                                    responsive: true,
-                                    url: '${task.audioUrl}'
-                                });
-
-                                const playBtn = document.getElementById('playPauseBtn');
-                                const currentTimeEl = document.getElementById('currentTime');
-                                const totalTimeEl = document.getElementById('totalTime');
-
-                                wavesurfer.on('ready', () => {
-                                    const duration = wavesurfer.getDuration();
-                                    totalTimeEl.textContent = formatTime(duration);
-                                });
-
-                                wavesurfer.on('audioprocess', () => {
-                                    currentTimeEl.textContent = formatTime(wavesurfer.getCurrentTime());
-                                });
-
-                                wavesurfer.on('seek', () => {
-                                    currentTimeEl.textContent = formatTime(wavesurfer.getCurrentTime());
-                                });
-
-                                playBtn.addEventListener('click', () => {
-                                    wavesurfer.playPause();
-                                    playBtn.innerHTML = wavesurfer.isPlaying() ? '<i class="fas fa-pause"></i> Pause' : '<i class="fas fa-play"></i> Play';
-                                });
-
-                                function formatTime(seconds) {
-                                    const date = new Date(seconds * 1000);
-                                    const mm = date.getUTCMinutes();
-                                    const ss = date.getUTCSeconds().toString().padStart(2, '0');
-                                    return `${mm}:${ss}`;
-                                }
-                            })();
-                        <\/script>
                     `;
                 }
 
@@ -1477,8 +1433,8 @@
                                 </div>
                                 ${task.language ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Language</span><span class="pdf-grid-value">${escapeHtml(task.language)}</span></div>` : ''}
                                 ${task.provider ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Provider</span><span class="pdf-grid-value">${escapeHtml(task.provider)}</span></div>` : ''}
-                                ${task.audioDuration ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Duration</span><span class="pdf-grid-value">${task.audioDuration}</span></div>` : ''}
-                                ${task.audioSize ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Size</span><span class="pdf-grid-value">${task.audioSize}</span></div>` : ''}
+                                ${(task.audioDuration || task.duration) ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Duration</span><span class="pdf-grid-value">${task.audioDuration || task.duration}</span></div>` : ''}
+                                ${(task.audioSize || task.size) ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Size</span><span class="pdf-grid-value">${task.audioSize || task.size}</span></div>` : ''}
                             </div>
                             <div class="pdf-section">
                                 <div class="pdf-section-title"><i class="fas fa-align-left"></i> Description</div>
@@ -1498,6 +1454,53 @@
                 `;
 
                 showModal(modalHtml);
+
+                // If audio exists, initialise waveform after modal is visible
+                if (task.category === 'transcription' && task.audioUrl) {
+                    setTimeout(() => {
+                        const wavesurfer = WaveSurfer.create({
+                            container: '#waveform',
+                            waveColor: '#6366f1',
+                            progressColor: '#10b981',
+                            cursorColor: '#475569',
+                            barWidth: 2,
+                            barRadius: 3,
+                            height: 128,
+                            responsive: true,
+                            url: task.audioUrl
+                        });
+
+                        const playBtn = document.getElementById('playPauseBtn');
+                        const currentTimeEl = document.getElementById('currentTime');
+                        const totalTimeEl = document.getElementById('totalTime');
+
+                        wavesurfer.on('ready', () => {
+                            const duration = wavesurfer.getDuration();
+                            totalTimeEl.textContent = formatTime(duration);
+                        });
+
+                        wavesurfer.on('audioprocess', () => {
+                            currentTimeEl.textContent = formatTime(wavesurfer.getCurrentTime());
+                        });
+
+                        wavesurfer.on('seek', () => {
+                            currentTimeEl.textContent = formatTime(wavesurfer.getCurrentTime());
+                        });
+
+                        playBtn.addEventListener('click', () => {
+                            wavesurfer.playPause();
+                            playBtn.innerHTML = wavesurfer.isPlaying() ? '<i class="fas fa-pause"></i> Pause' : '<i class="fas fa-play"></i> Play';
+                        });
+
+                        function formatTime(seconds) {
+                            if (isNaN(seconds)) return '00:00';
+                            const date = new Date(seconds * 1000);
+                            const mm = date.getUTCMinutes();
+                            const ss = date.getUTCSeconds().toString().padStart(2, '0');
+                            return `${mm}:${ss}`;
+                        }
+                    }, 200);
+                }
             } catch (e) {
                 showAlert('Error loading task details','error');
             }
@@ -1532,7 +1535,7 @@
                                 <source src="${task.audioUrl}" type="audio/mpeg">
                                 Your browser does not support the audio element.
                             </audio>
-                            ${task.audioDuration ? `<p style="font-size:0.7rem; margin-top:0.2rem;">Duration: ${task.audioDuration}</p>` : ''}
+                            ${(task.audioDuration || task.duration) ? `<p style="font-size:0.7rem; margin-top:0.2rem;">Duration: ${task.audioDuration || task.duration}</p>` : ''}
                             <button class="btn btn-sm btn-secondary" onclick="copyToClipboard('${task.audioUrl}')" style="margin-top:0.3rem;"><i class="fas fa-copy"></i> Copy Audio Link</button>
                         </div>
                     `;
@@ -2883,7 +2886,8 @@
             if (acceptedTasksListener) acceptedTasksListener();
             acceptedTasksListener = db.collection('users').doc(currentUser.uid).collection('acceptedTasks').onSnapshot(snap => {
                 const count = snap.size;
-                ['desktopSubmitBadge', 'mobileSubmitBadge', 'bottomSubmitBadge'].forEach(id => {
+                // Removed 'bottomSubmitBadge' because it doesn't exist
+                ['desktopSubmitBadge', 'mobileSubmitBadge'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) {
                         el.textContent = count;
