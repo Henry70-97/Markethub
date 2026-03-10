@@ -12,22 +12,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Chart.js for earnings graph -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- WaveSurfer.js for audio waveform -->
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* All existing styles (unchanged) plus minor additions for new sections */
+        /* All existing styles (unchanged) */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', 'Plus Jakarta Sans', sans-serif; }
-        body { background: linear-gradient(145deg, #f1f5f9 0%, #e6eefc 100%); min-height: 100vh; padding-bottom: 80px; } /* Add padding for bottom nav */
-        .app-container { max-width: 1200px; margin: 0 auto; padding: 0.75rem; } /* Reduced padding for mobile */
+        body { background: linear-gradient(145deg, #f1f5f9 0%, #e6eefc 100%); min-height: 100vh; padding-bottom: 80px; }
+        .app-container { max-width: 1200px; margin: 0 auto; padding: 0.75rem; }
 
-        /* Logo styling inside header */
-        .logo img {
-            max-height: 40px;
-            width: auto;
-            display: block;
-        }
+        .logo img { max-height: 40px; width: auto; display: block; }
 
         .news-tv-container { background: #0b0f18; border-radius: 1.5rem; padding: 0.6rem 0.8rem 0.8rem 0.8rem; margin-bottom: 1rem; box-shadow: 0 15px 30px rgba(0,0,0,0.3), inset 0 1px 4px rgba(255,255,255,0.1); border: 1px solid #2d3748; }
         .news-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; padding-left: 0.3rem; flex-wrap: wrap; }
@@ -1210,12 +1203,12 @@
                                 <tr>
                                     <th style="padding: 0.75rem; text-align: left;">Date</th>
                                     <th style="padding: 0.75rem; text-align: left;">Category</th>
-                                    <th style="padding: 0.75rem; text-align: left;">Language</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Language / Client</th>
                                     <th style="padding: 0.75rem; text-align: left;">Provider</th>
                                     <th style="padding: 0.75rem; text-align: left;">Status</th>
-                                    <th style="padding: 0.75rem; text-align: left;">Duration</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Duration / Deadline</th>
                                     <th style="padding: 0.75rem; text-align: left;">Format</th>
-                                    <th style="padding: 0.75rem; text-align: left;">Size</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Size / Difficulty</th>
                                     <th style="padding: 0.75rem; text-align: left;">Amount</th>
                                     <th style="padding: 0.75rem; text-align: left;">Actions</th>
                                 </tr>
@@ -1224,25 +1217,33 @@
                 `;
 
                 for (let t of filteredTasks) {
-                    // Fallback fields with multiple possible names
                     const createdDate = t.createdAt?.toDate?.() || new Date();
                     const dateStr = createdDate.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
                     const timeStr = createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    
-                    const language = t.language || t.lang || 'English (USA)';
-                    const provider = t.provider || t.transcriptionProvider || 'aws';
-                    const taskStatus = t.taskStatus || t.status || 'Pending';
-                    const duration = t.audioDuration || t.duration || '00:20:00';
-                    const format = t.audioFormat || t.format || 'mp3';
-                    const size = t.audioSize || t.size || '13.37 MB';
-                    const amount = formatBoth(parseFloat(t.reward) || 0);
+
+                    // Column overrides based on category
+                    let languageClient = t.language || t.lang || 'English (USA)';
+                    let provider = t.provider || t.transcriptionProvider || 'aws';
+                    let duration = t.audioDuration || t.duration || '00:20:00';
+                    let format = t.audioFormat || t.format || 'mp3';
+                    let size = t.audioSize || t.size || '13.37 MB';
+
+                    // For non‑transcription tasks, adjust columns
+                    if (t.category !== 'transcription') {
+                        languageClient = t.clientName || 'Admin';               // show client name
+                        provider = '—';                                         // not applicable
+                        duration = t.deadline ? formatDeadlineShort(t.deadline) : 'No deadline';
+                        format = t.category === 'design' ? 'Design' : 
+                                 t.category === 'projects' ? 'Project' : 'Text';
+                        size = t.difficulty ? t.difficulty.charAt(0).toUpperCase() + t.difficulty.slice(1) : 'Medium';
+                    }
 
                     // Check if user already accepted / task full / expired
                     const submitted = await hasUserSubmitted(t.id);
                     const expired = isDeadlinePassed(t.deadline);
                     const maxCollab = t.collaborable ? (t.maxCollaborators || 5) : 2;
                     const acceptDisabled = t.userAccepted || (t.acceptedCount >= maxCollab) || expired || submitted;
-                    let statusDisplay = taskStatus;
+                    let statusDisplay = t.taskStatus || t.status || 'Pending';
                     if (expired) statusDisplay = 'Expired';
                     else if (t.acceptedCount >= maxCollab) statusDisplay = 'Full';
                     else if (t.userAccepted) statusDisplay = 'Accepted';
@@ -1252,13 +1253,13 @@
                         <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
                             <td style="padding: 0.75rem; font-size:0.85rem;">${dateStr}<br><span style="color:#64748b; font-size:0.7rem;">${timeStr}</span></td>
                             <td style="padding: 0.75rem;">${escapeHtml(t.category || 'other')}</td>
-                            <td style="padding: 0.75rem;">${escapeHtml(language)}</td>
+                            <td style="padding: 0.75rem;">${escapeHtml(languageClient)}</td>
                             <td style="padding: 0.75rem;">${escapeHtml(provider)}</td>
                             <td style="padding: 0.75rem;"><span class="badge warning" style="background:#f59e0b20; color:#f59e0b;">${escapeHtml(statusDisplay)}</span></td>
                             <td style="padding: 0.75rem;">${duration}</td>
                             <td style="padding: 0.75rem;">${format}</td>
                             <td style="padding: 0.75rem;">${size}</td>
-                            <td style="padding: 0.75rem; font-weight:700; color:#10b981;">${amount}</td>
+                            <td style="padding: 0.75rem; font-weight:700; color:#10b981;">${formatBoth(parseFloat(t.reward) || 0)}</td>
                             <td style="padding: 0.75rem;">
                                 <button class="btn btn-sm btn-primary" onclick="viewTaskDetails('${t.id}')" style="padding:0.3rem 0.8rem; font-size:0.75rem;">
                                     <i class="fas fa-eye"></i> View Task
@@ -1276,6 +1277,20 @@
                 html += '</tbody></table></div>';
             }
             document.getElementById('content').innerHTML = html;
+        }
+
+        // Helper for shorter deadline display
+        function formatDeadlineShort(deadline) {
+            if (!deadline) return 'No deadline';
+            const d = deadline.toDate ? deadline.toDate() : new Date(deadline);
+            const diff = d - new Date();
+            if (diff < 0) return 'Expired';
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days > 7) return d.toLocaleDateString();
+            if (days > 1) return `${days} days`;
+            if (days === 1) return '1 day';
+            const hours = Math.ceil(diff / (1000 * 60 * 60));
+            return `${hours} hr`;
         }
 
         function filterBarHTML() { function options(arr) { return arr.map(v => `<option value="${v}">${v}</option>`).join(''); } return `<div class="filter-bar"><div class="filter-title"><i class="fas fa-sliders-h"></i> Filter & Sort</div><div class="filter-row"><div class="filter-group"><label>Category</label><select id="categoryFilter" class="filter-select" onchange="currentFilters.category=this.value;applyFilters()">${options(['all','writing','data-entry','research','translation','other'])}</select></div><div class="filter-group"><label>Deadline</label><select id="deadlineFilter" class="filter-select" onchange="currentFilters.deadline=this.value;applyFilters()">${options(['all','urgent','week','expired'])}</select></div><div class="filter-group"><label>Amount</label><select id="amountFilter" class="filter-select" onchange="currentFilters.amount=this.value;applyFilters()">${options(['all','0-5','5-10','10-20','20-50','50-999'])}</select></div><div class="filter-group"><label>Difficulty</label><select id="difficultyFilter" class="filter-select" onchange="currentFilters.difficulty=this.value;applyFilters()">${options(['all','beginner','medium','hard'])}</select></div><div class="filter-group"><label>Sort By</label><select id="sortFilter" class="filter-select" onchange="currentFilters.sortBy=this.value;applyFilters()">${options(['newest','oldest','amount-high','amount-low','deadline-urgent'])}</select></div><div class="filter-actions"><button class="filter-btn reset" onclick="resetFilters()"><i class="fas fa-redo-alt"></i> Reset</button></div></div><div id="activeFilters" class="active-filters"></div></div>`; }
@@ -1387,7 +1402,7 @@
             }
         }
 
-        // ==================== UPDATED VIEW TASK DETAILS (WITH WAVEFORM) ====================
+        // ==================== UPDATED VIEW TASK DETAILS (NO WAVEFORM) ====================
         async function viewTaskDetails(taskId) {
             try {
                 const doc = await db.collection('tasks').doc(taskId).get();
@@ -1396,18 +1411,20 @@
                 currentTaskViewed = task;
                 refreshMirror();
 
-                // Build modal HTML – waveform container with a placeholder
+                // Build modal HTML – simple audio player if audioUrl exists
                 let audioHtml = '';
                 if (task.category === 'transcription' && task.audioUrl) {
                     audioHtml = `
                         <div class="pdf-section">
                             <div class="pdf-section-title"><i class="fas fa-headphones"></i> Audio Preview</div>
                             <div class="pdf-section-content" style="padding:1rem;">
-                                <div id="waveform" style="width:100%; height:128px; background:#f1f5f9; border-radius:0.5rem;"></div>
-                                <div style="display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center;">
-                                    <button id="playPauseBtn" class="btn btn-sm btn-primary"><i class="fas fa-play"></i> Play</button>
-                                    <span id="currentTime">00:00</span> / <span id="totalTime">${task.audioDuration || task.duration || '00:00'}</span>
-                                    <a href="${task.audioUrl}" target="_blank" class="btn btn-sm btn-secondary" style="margin-left:auto;"><i class="fas fa-download"></i> Download</a>
+                                <audio controls style="width:100%;">
+                                    <source src="${task.audioUrl}" type="audio/mpeg">
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
+                                    <span>${task.audioDuration || task.duration || '00:00'}</span>
+                                    <a href="${task.audioUrl}" target="_blank" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Download</a>
                                 </div>
                             </div>
                         </div>
@@ -1435,6 +1452,8 @@
                                 ${task.provider ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Provider</span><span class="pdf-grid-value">${escapeHtml(task.provider)}</span></div>` : ''}
                                 ${(task.audioDuration || task.duration) ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Duration</span><span class="pdf-grid-value">${task.audioDuration || task.duration}</span></div>` : ''}
                                 ${(task.audioSize || task.size) ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Size</span><span class="pdf-grid-value">${task.audioSize || task.size}</span></div>` : ''}
+                                ${task.deadline ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Deadline</span><span class="pdf-grid-value">${formatDeadline(task.deadline)}</span></div>` : ''}
+                                ${task.difficulty ? `<div class="pdf-grid-item"><span class="pdf-grid-label">Difficulty</span><span class="pdf-grid-value">${task.difficulty}</span></div>` : ''}
                             </div>
                             <div class="pdf-section">
                                 <div class="pdf-section-title"><i class="fas fa-align-left"></i> Description</div>
@@ -1454,53 +1473,6 @@
                 `;
 
                 showModal(modalHtml);
-
-                // If audio exists, initialise waveform after modal is visible
-                if (task.category === 'transcription' && task.audioUrl) {
-                    setTimeout(() => {
-                        const wavesurfer = WaveSurfer.create({
-                            container: '#waveform',
-                            waveColor: '#6366f1',
-                            progressColor: '#10b981',
-                            cursorColor: '#475569',
-                            barWidth: 2,
-                            barRadius: 3,
-                            height: 128,
-                            responsive: true,
-                            url: task.audioUrl
-                        });
-
-                        const playBtn = document.getElementById('playPauseBtn');
-                        const currentTimeEl = document.getElementById('currentTime');
-                        const totalTimeEl = document.getElementById('totalTime');
-
-                        wavesurfer.on('ready', () => {
-                            const duration = wavesurfer.getDuration();
-                            totalTimeEl.textContent = formatTime(duration);
-                        });
-
-                        wavesurfer.on('audioprocess', () => {
-                            currentTimeEl.textContent = formatTime(wavesurfer.getCurrentTime());
-                        });
-
-                        wavesurfer.on('seek', () => {
-                            currentTimeEl.textContent = formatTime(wavesurfer.getCurrentTime());
-                        });
-
-                        playBtn.addEventListener('click', () => {
-                            wavesurfer.playPause();
-                            playBtn.innerHTML = wavesurfer.isPlaying() ? '<i class="fas fa-pause"></i> Pause' : '<i class="fas fa-play"></i> Play';
-                        });
-
-                        function formatTime(seconds) {
-                            if (isNaN(seconds)) return '00:00';
-                            const date = new Date(seconds * 1000);
-                            const mm = date.getUTCMinutes();
-                            const ss = date.getUTCSeconds().toString().padStart(2, '0');
-                            return `${mm}:${ss}`;
-                        }
-                    }, 200);
-                }
             } catch (e) {
                 showAlert('Error loading task details','error');
             }
@@ -1526,7 +1498,7 @@
                 const workToShow = savedDraft || existingWork;
 
                 let extraFieldsHtml = '';
-                // Audio player for transcription tasks
+                // Audio player for transcription tasks (simple, no waveform)
                 if (task.category === 'transcription' && task.audioUrl) {
                     extraFieldsHtml += `
                         <div style="margin-bottom:1rem; background:#f0f9ff; padding:1rem; border-radius:0.5rem; border-left:4px solid #0284c7;">
