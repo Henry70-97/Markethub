@@ -1353,39 +1353,90 @@
                 }
                 const task = taskDoc.data();
 
+                // Check if user has already accepted or submitted
+                const accepted = await hasUserAccepted(taskId);
+                const submitted = await hasUserSubmitted(taskId);
+                const expired = isDeadlinePassed(task.deadline);
+
                 const modalHtml = `
                     <div class="modal-content" style="max-width: 700px; text-align: center;">
                         <h3>${escapeHtml(task.title || 'Transcription Task')}</h3>
-                        <div id="waveform" style="width:100%; height:128px; margin: 1rem 0;"></div>
+                        <div id="waveform-container" style="width:100%; height:128px; margin: 1rem 0; background:#f1f5f9; border-radius:8px;"></div>
                         <div style="display: flex; justify-content: space-around; margin: 1rem 0;">
                             <span><i class="fas fa-clock"></i> ${task.audioDuration || '00:20:00'}</span>
                             <span><i class="fas fa-database"></i> ${task.audioSize || '14.39 MB'}</span>
                             <span><i class="fas fa-tag"></i> ${formatBoth(parseFloat(task.reward) || 0)}</span>
                         </div>
-                        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                        <div style="display:flex; gap:0.5rem; justify-content:center;">
+                            ${!accepted && !submitted && !expired ? 
+                                `<button class="btn btn-accept" onclick="acceptTask('${taskId}')">Accept Task</button>` : 
+                                (accepted ? '<button class="btn btn-success" disabled>Already Accepted</button>' : 
+                                (submitted ? '<button class="btn btn-success" disabled>Already Submitted</button>' : 
+                                '<button class="btn btn-disabled" disabled>Expired</button>'))}
+                            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                        </div>
                     </div>
                 `;
                 showModal(modalHtml);
 
-                // Initialize WaveSurfer after modal is visible
-                setTimeout(() => {
-                    if (!task.audioUrl) {
-                        document.getElementById('waveform').innerHTML = '<p style="color:red;">Audio URL missing</p>';
-                        return;
+                // Wait for modal to be fully in DOM
+                const observer = new MutationObserver((mutations, obs) => {
+                    const container = document.getElementById('waveform-container');
+                    if (container) {
+                        obs.disconnect();
+                        // Small delay to ensure layout
+                        setTimeout(() => initializeWaveSurfer(container, task.audioUrl), 100);
                     }
-                    const wavesurfer = WaveSurfer.create({
-                        container: '#waveform',
-                        waveColor: '#6366f1',
-                        progressColor: '#10b981',
-                        url: task.audioUrl,
-                        mediaControls: true,  // shows play/pause, volume, etc.
-                        height: 128,
-                    });
-                }, 200);
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+
             } catch (e) {
                 console.error('Error loading transcription task view:', e);
                 showAlert('Error loading audio', 'error');
             }
+        }
+
+        function initializeWaveSurfer(container, audioUrl) {
+            if (!audioUrl) {
+                container.innerHTML = '<p style="color:red;">Audio URL missing</p>';
+                return;
+            }
+            try {
+                const wavesurfer = WaveSurfer.create({
+                    container: container,
+                    waveColor: '#6366f1',
+                    progressColor: '#10b981',
+                    url: audioUrl,
+                    mediaControls: true,
+                    height: 128,
+                });
+
+                wavesurfer.on('error', (err) => {
+                    console.error('WaveSurfer error:', err);
+                    container.innerHTML = `
+                        <audio controls style="width:100%; height:30px;">
+                            <source src="${audioUrl}" type="audio/mpeg">
+                            Your browser does not support audio.
+                        </audio>
+                        <p style="color:#ef4444; font-size:0.8rem;">Waveform failed, using fallback player.</p>
+                    `;
+                });
+            } catch (err) {
+                console.error('WaveSurfer init error:', err);
+                container.innerHTML = `
+                    <audio controls style="width:100%; height:30px;">
+                        <source src="${audioUrl}" type="audio/mpeg">
+                        Your browser does not support audio.
+                    </audio>
+                `;
+            }
+        }
+
+        // Helper to check if user has accepted a task
+        async function hasUserAccepted(taskId) {
+            const snap = await db.collection('tasks').doc(taskId)
+                .collection('taskAccepts').where('userId', '==', currentUser.uid).get();
+            return !snap.empty;
         }
 
         function filterBarHTML() { function options(arr) { return arr.map(v => `<option value="${v}">${v}</option>`).join(''); } return `<div class="filter-bar"><div class="filter-title"><i class="fas fa-sliders-h"></i> Filter & Sort</div><div class="filter-row"><div class="filter-group"><label>Category</label><select id="categoryFilter" class="filter-select" onchange="currentFilters.category=this.value;applyFilters()">${options(['all','writing','data-entry','research','translation','other'])}</select></div><div class="filter-group"><label>Deadline</label><select id="deadlineFilter" class="filter-select" onchange="currentFilters.deadline=this.value;applyFilters()">${options(['all','urgent','week','expired'])}</select></div><div class="filter-group"><label>Amount</label><select id="amountFilter" class="filter-select" onchange="currentFilters.amount=this.value;applyFilters()">${options(['all','0-5','5-10','10-20','20-50','50-999'])}</select></div><div class="filter-group"><label>Difficulty</label><select id="difficultyFilter" class="filter-select" onchange="currentFilters.difficulty=this.value;applyFilters()">${options(['all','beginner','medium','hard'])}</select></div><div class="filter-group"><label>Sort By</label><select id="sortFilter" class="filter-select" onchange="currentFilters.sortBy=this.value;applyFilters()">${options(['newest','oldest','amount-high','amount-low','deadline-urgent'])}</select></div><div class="filter-actions"><button class="filter-btn reset" onclick="resetFilters()"><i class="fas fa-redo-alt"></i> Reset</button></div></div><div id="activeFilters" class="active-filters"></div></div>`; }
