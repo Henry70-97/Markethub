@@ -1356,7 +1356,7 @@
         }
 
         // NEW: Payment approved popup
-        function showPaymentApprovedPopup(amount, bonus) {
+        function showPaymentApprovedPopup(amount, bonus, membershipType) {
             const dlg = document.getElementById('alertDialog');
             const overlay = document.getElementById('overlay');
             const icon = document.getElementById('alertIcon');
@@ -1367,7 +1367,7 @@
             dlg.className = 'alert-dialog success';
             icon.className = 'fas fa-check-circle';
             title.textContent = 'Payment Approved!';
-            msg.textContent = `Your payment of $${amount} has been approved and credited to your wallet with a $${bonus} (10%) bonus! Total added: $${(amount + bonus).toFixed(2)}.`;
+            msg.textContent = `Your ${membershipType.toUpperCase()} payment of $${amount} has been approved and credited to your wallet with a $${bonus} (10%) bonus! Total added: $${(amount + bonus).toFixed(2)}. You are now a ${membershipType.toUpperCase()} member.`;
             btn.onclick = hideAlert;
             
             overlay.classList.add('show');
@@ -2562,7 +2562,7 @@
             }
         }
 
-        // ==================== MEMBERSHIP OPTIONS ====================
+        // ==================== MEMBERSHIP OPTIONS (with type) ====================
         function showMembershipOptions() {
             const premiumPkg = (membershipPackages && membershipPackages.premium) || DEFAULT_MEMBERSHIP_PACKAGES.premium;
             showModal(`<div class="modal-content" style="text-align:center;">
@@ -2585,7 +2585,7 @@
                     <input type="text" id="transactionCode" class="smart-input" placeholder="Transaction Code / ID" required>
                     <input type="number" id="paymentAmount" class="smart-input" placeholder="Amount Paid (USD)" step="0.01" required>
                     <textarea id="paymentNotes" class="smart-textarea" placeholder="Additional notes (optional)"></textarea>
-                    <button class="btn btn-success" onclick="submitPaymentVerification()">Submit for Approval</button>
+                    <button class="btn btn-success" onclick="submitPaymentVerification('premium')">Submit for Approval</button>
                 </div>
                 <button class="btn btn-secondary" onclick="closeModal()">Close</button>
             </div>`);
@@ -2618,13 +2618,13 @@
                     <input type="text" id="transactionCode" class="smart-input" placeholder="Transaction Code / ID" required>
                     <input type="number" id="paymentAmount" class="smart-input" placeholder="Amount Paid (USD)" step="0.01" required>
                     <textarea id="paymentNotes" class="smart-textarea" placeholder="Additional notes (optional)"></textarea>
-                    <button class="btn btn-success" onclick="submitPaymentVerification()">Submit for Approval</button>
+                    <button class="btn btn-success" onclick="submitPaymentVerification('elite')">Submit for Approval</button>
                 </div>
                 <button class="btn btn-secondary" onclick="closeModal()">Close</button>
             </div>`);
         }
 
-        async function submitPaymentVerification() {
+        async function submitPaymentVerification(membershipType) {
             const txCode = document.getElementById('transactionCode')?.value;
             const amount = parseFloat(document.getElementById('paymentAmount')?.value);
             const notes = document.getElementById('paymentNotes')?.value || '';
@@ -2636,10 +2636,13 @@
                     userId: currentUser.uid,
                     userName: userData.displayName,
                     userEmail: currentUser.email,
+                    membershipType: membershipType, // store the type
                     transactionCode: txCode,
+                    paymentMessage: txCode, // for admin compatibility
                     amount: amount,
                     notes: notes,
                     status: 'pending',
+                    credited: false, // to prevent double-crediting
                     submittedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 showModal(`<div class="modal-content" style="text-align:center;"><div class="success-check"><i class="fas fa-check"></i></div><h3 style="color:#10b981;">Thank You!</h3><p>Payment verification submitted.<br>You'll be notified once approved. The amount (plus 10% bonus) will be added to your wallet.</p><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`);
@@ -2758,6 +2761,7 @@
                     type: 'prepaid',
                     price: price,
                     transactionCode: txCode,
+                    paymentMessage: txCode, // for admin compatibility
                     paymentNotes: document.getElementById('paymentNotes')?.value || '',
                     status: 'pending',
                     appliedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3138,35 +3142,60 @@
             }
         }
 
-        // ==================== MEMBERSHIP PAYMENTS LISTENER (NEW) ====================
+        // ==================== MEMBERSHIP PAYMENTS LISTENER (with auto-credit) ====================
         function setupMembershipPaymentsListener() {
             if (membershipPaymentsListener) membershipPaymentsListener();
             membershipPaymentsListener = db.collection('membershipPayments')
                 .where('userId', '==', currentUser.uid)
-                .onSnapshot(snapshot => {
+                .onSnapshot(async snapshot => {
                     let newPendingBalance = 0;
-                    snapshot.docChanges().forEach(change => {
+                    for (const change of snapshot.docChanges()) {
                         const payment = change.doc.data();
+                        const paymentId = change.doc.id;
                         if (change.type === 'added' && payment.status === 'pending') {
                             newPendingBalance += payment.amount || 0;
                         } else if (change.type === 'modified') {
-                            const oldData = change.doc.metadata.hasPendingWrites ? null : change.doc.data(); // can't easily get old, but we can check if status changed
-                            // We'll rely on the fact that when status changes from pending to approved, we want to show modal
-                            if (payment.status === 'approved' && !shownPaymentApprovalIds.has(change.doc.id)) {
-                                shownPaymentApprovalIds.add(change.doc.id);
-                                const bonus = (payment.amount || 0) * 0.1;
-                                showPaymentApprovedPopup(payment.amount || 0, bonus);
-                                // Update pending balance after approval
-                                newPendingBalance -= (payment.amount || 0);
+                            // If status changed to approved and not yet credited, credit the wallet
+                            if (payment.status === 'approved' && !payment.credited) {
+                                const amount = payment.amount || 0;
+                                const bonus = amount * 0.1;
+                                const membershipType = payment.membershipType || 'premium'; // fallback
+                                
+                                // Update user wallet and membership type
+                                await db.runTransaction(async (transaction) => {
+                                    const userRef = db.collection('users').doc(currentUser.uid);
+                                    transaction.update(userRef, {
+                                        wallet: firebase.firestore.FieldValue.increment(amount + bonus),
+                                        membershipType: membershipType,
+                                        membershipPaid: true,
+                                        membershipStatus: 'active'
+                                    });
+                                    // Mark payment as credited
+                                    transaction.update(change.doc.ref, { credited: true });
+                                });
+                                
+                                // Record transaction
+                                await db.collection('transactions').add({
+                                    userId: currentUser.uid,
+                                    userEmail: currentUser.email,
+                                    amount: amount + bonus,
+                                    type: 'membership_credit',
+                                    description: `Membership upgrade to ${membershipType} (payment $${amount} + 10% bonus $${bonus})`,
+                                    relatedId: paymentId,
+                                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                
+                                // Show popup
+                                showPaymentApprovedPopup(amount, bonus, membershipType);
                             } else if (payment.status === 'pending') {
-                                newPendingBalance += (payment.amount || 0);
+                                newPendingBalance += payment.amount || 0;
                             }
                         } else if (change.type === 'removed') {
                             // if removed, subtract from pending
                             newPendingBalance -= (payment.amount || 0);
                         }
-                    });
-                    // Also recompute pending balance from all pending docs (to be safe)
+                    }
+                    // Recompute pending balance from all pending docs (to be safe)
                     snapshot.docs.forEach(doc => {
                         const p = doc.data();
                         if (p.status === 'pending') {
