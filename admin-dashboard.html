@@ -5772,6 +5772,441 @@
             }
         });  
           
+        // ==================== MISSING CRITICAL FUNCTIONS ADDED ====================
+        window.toggleMobileMenu = function() {
+            const overlay = document.getElementById('mobileMenuOverlay');
+            const menu = document.getElementById('mobileMenu');
+            if (overlay && menu) {
+                overlay.classList.toggle('active');
+                menu.classList.toggle('active');
+            }
+        };
+
+        window.switchTab = function(tabName) {
+            currentTab = tabName;
+            loadDashboard();
+            
+            // Update active tab classes for desktop tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                if (tab.getAttribute('data-tab') === tabName) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+            
+            // Update bottom nav active state
+            document.querySelectorAll('.bottom-nav-item').forEach(item => {
+                const onclickAttr = item.getAttribute('onclick');
+                if (onclickAttr && onclickAttr.includes(tabName)) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        };
+
+        window.logout = function() {
+            auth.signOut().then(() => {
+                window.location.href = 'index.html';
+            }).catch(error => {
+                console.error('Logout error:', error);
+                showAlert('Error logging out: ' + error.message, 'error');
+            });
+        };
+
+        window.showModal = function(content) {
+            const modal = document.getElementById('modal');
+            const backdrop = document.getElementById('modalBackdrop');
+            const modalContent = document.getElementById('modalContent');
+            if (modal && backdrop && modalContent) {
+                modalContent.innerHTML = content;
+                modal.classList.add('active');
+                backdrop.classList.add('active');
+            }
+        };
+
+        window.closeModal = function() {
+            const modal = document.getElementById('modal');
+            const backdrop = document.getElementById('modalBackdrop');
+            if (modal && backdrop) {
+                modal.classList.remove('active');
+                backdrop.classList.remove('active');
+            }
+        };
+
+        window.showAlert = function(message, type = 'info') {
+            const alertModal = document.getElementById('alertModal');
+            const alertBackdrop = document.getElementById('alertBackdrop');
+            const alertIcon = document.getElementById('alertIcon');
+            const alertTitle = document.getElementById('alertTitle');
+            const alertMessage = document.getElementById('alertMessage');
+            const alertButton = document.getElementById('alertButton');
+            
+            if (!alertModal || !alertBackdrop) return;
+            
+            // Set icon and title based on type
+            let iconClass = 'info';
+            let title = 'Info';
+            
+            if (type === 'success') {
+                iconClass = 'success';
+                title = 'Success';
+            } else if (type === 'error') {
+                iconClass = 'error';
+                title = 'Error';
+            } else if (type === 'warning') {
+                iconClass = 'warning';
+                title = 'Warning';
+            } else {
+                iconClass = 'info';
+                title = 'Info';
+            }
+            
+            alertIcon.className = `alert-icon ${iconClass}`;
+            alertIcon.innerHTML = type === 'success' ? '<i class="fas fa-check-circle"></i>' : 
+                                 type === 'error' ? '<i class="fas fa-exclamation-circle"></i>' : 
+                                 type === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' : 
+                                 '<i class="fas fa-info-circle"></i>';
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertButton.className = `alert-button ${iconClass}`;
+            
+            alertModal.classList.add('active');
+            alertBackdrop.classList.add('active');
+            
+            // Auto close after 3 seconds for success/info, longer for errors
+            const timeout = type === 'error' ? 5000 : 3000;
+            setTimeout(() => {
+                alertModal.classList.remove('active');
+                alertBackdrop.classList.remove('active');
+            }, timeout);
+        };
+
+        // Initialize alert button click
+        document.getElementById('alertButton')?.addEventListener('click', function() {
+            document.getElementById('alertModal').classList.remove('active');
+            document.getElementById('alertBackdrop').classList.remove('active');
+        });
+
+        // ==================== Helper Functions ====================
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        function formatCurrency(amount) {
+            return '$' + (amount || 0).toFixed(2);
+        }
+
+        function getDeadlineStatus(deadline) {
+            if (!deadline) return null;
+            const now = new Date();
+            const deadlineDate = deadline.seconds ? new Date(deadline.seconds * 1000) : new Date(deadline);
+            const diff = deadlineDate - now;
+            if (diff < 0) return { class: 'danger', text: 'Overdue' };
+            if (diff < 24 * 60 * 60 * 1000) return { class: 'warning', text: 'Due soon' };
+            return { class: 'success', text: 'On track' };
+        }
+
+        function getPackageByType(type) {
+            return membershipPackages?.[type] || DEFAULT_MEMBERSHIP_PACKAGES[type] || DEFAULT_MEMBERSHIP_PACKAGES.basic;
+        }
+
+        // ==================== LOAD DASHBOARD ====================
+        async function loadDashboard() {
+            try {
+                // Load stats
+                const stats = await loadStats();
+                
+                // Load content based on current tab
+                switch (currentTab) {
+                    case 'users':
+                        await loadUsers();
+                        break;
+                    case 'tasks':
+                        await loadTasks();
+                        break;
+                    case 'teams':
+                        await loadTeamApprovals();
+                        break;
+                    case 'submissions':
+                        await loadSubmissions();
+                        break;
+                    case 'withdrawals':
+                        await loadWithdrawals();
+                        break;
+                    case 'memberships':
+                        await loadMemberships();
+                        break;
+                    case 'referrals':
+                        await loadReferrals();
+                        break;
+                    case 'messages':
+                        await loadMessages();
+                        break;
+                    case 'transactions':
+                        await loadTransactions();
+                        break;
+                    case 'training':
+                        loadTrainingCenter();
+                        break;
+                    case 'logins':
+                        await loadLoginLogs();
+                        break;
+                    case 'petitions':
+                        await loadPetitions();
+                        break;
+                    case 'leaderboard':
+                        await loadLeaderboardManager();
+                        break;
+                    case 'faq':
+                        await loadFaqManager();
+                        break;
+                    case 'feedback':
+                        await loadFeedbackManager();
+                        break;
+                    case 'howitworks':
+                        await loadHowItWorksEditor();
+                        break;
+                    case 'tickers':
+                        await loadTickers();
+                        break;
+                    case 'deadlineTracker':
+                        await loadDeadlineTracker();
+                        break;
+                    case 'settings':
+                        await loadSettings();
+                        break;
+                    default:
+                        await loadUsers();
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showAlert('Error loading dashboard: ' + error.message, 'error');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const [users, tasks, submissions, withdrawals, memberships] = await Promise.all([
+                    db.collection('users').get(),
+                    db.collection('tasks').where('active', '==', true).get(),
+                    db.collection('submissions').where('status', '==', 'pending').get(),
+                    db.collection('withdrawals').where('status', '==', 'pending').get(),
+                    db.collection('membershipPayments').where('status', '==', 'pending').get()
+                ]);
+                
+                const statsGrid = document.getElementById('statsGrid');
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <i class="fas fa-users"></i>
+                        <div class="stat-value">${users.size}</div>
+                        <div>Total Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-tasks"></i>
+                        <div class="stat-value">${tasks.size}</div>
+                        <div>Active Tasks</div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-clock"></i>
+                        <div class="stat-value">${submissions.size}</div>
+                        <div>Pending Submissions</div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <div class="stat-value">${withdrawals.size}</div>
+                        <div>Pending Withdrawals</div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-crown"></i>
+                        <div class="stat-value">${memberships.size}</div>
+                        <div>Membership Requests</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // ==================== LOAD SETTINGS FUNCTIONS ====================
+        async function loadMembershipPackages() {
+            try {
+                const doc = await db.collection('settings').doc('membershipPackages').get();
+                if (doc.exists) {
+                    membershipPackages = doc.data();
+                } else {
+                    membershipPackages = DEFAULT_MEMBERSHIP_PACKAGES;
+                    await db.collection('settings').doc('membershipPackages').set(DEFAULT_MEMBERSHIP_PACKAGES);
+                }
+            } catch (error) {
+                console.error('Error loading membership packages:', error);
+                membershipPackages = DEFAULT_MEMBERSHIP_PACKAGES;
+            }
+        }
+
+        async function saveMembershipPackages(packages) {
+            try {
+                await db.collection('settings').doc('membershipPackages').set(packages);
+                membershipPackages = packages;
+                showAlert('Membership packages saved successfully!', 'success');
+                return true;
+            } catch (error) {
+                console.error('Error saving membership packages:', error);
+                showAlert('Error saving packages: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        async function loadFeeSettings() {
+            try {
+                const doc = await db.collection('settings').doc('feeSettings').get();
+                if (doc.exists) {
+                    feeSettings = doc.data();
+                } else {
+                    feeSettings = DEFAULT_FEE_SETTINGS;
+                    await db.collection('settings').doc('feeSettings').set(DEFAULT_FEE_SETTINGS);
+                }
+            } catch (error) {
+                console.error('Error loading fee settings:', error);
+                feeSettings = DEFAULT_FEE_SETTINGS;
+            }
+        }
+
+        async function loadPaymentSettings() {
+            try {
+                const doc = await db.collection('settings').doc('paymentSettings').get();
+                if (doc.exists) {
+                    paymentUrl = doc.data().paymentUrl || '';
+                }
+            } catch (error) {
+                console.error('Error loading payment settings:', error);
+                paymentUrl = '';
+            }
+        }
+
+        async function savePaymentSettings(url) {
+            try {
+                await db.collection('settings').doc('paymentSettings').set({
+                    paymentUrl: url,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                paymentUrl = url;
+                showAlert('Payment URL saved successfully!', 'success');
+                loadSettings();
+            } catch (error) {
+                console.error('Error saving payment URL:', error);
+                showAlert('Error saving payment URL: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== TICKER FUNCTIONS ====================
+        window.showAddTicker = function() {
+            showModal(`
+                <h3 style="margin-bottom:1rem;">Add Manual Ticker</h3>
+                <input type="text" id="tickerMessage" placeholder="Ticker message" required>
+                <input type="number" id="tickerOrder" placeholder="Order (e.g., 1,2,3)" min="0" value="0">
+                <button class="btn btn-success" id="saveTickerBtn">Add Ticker</button>
+            `);
+            document.getElementById('saveTickerBtn').addEventListener('click', async function() {
+                const message = document.getElementById('tickerMessage').value.trim();
+                const order = parseInt(document.getElementById('tickerOrder').value) || 0;
+                if (!message) {
+                    showAlert('Message required', 'error');
+                    return;
+                }
+                try {
+                    await db.collection('tickers').add({
+                        message,
+                        order,
+                        active: true,
+                        type: 'manual',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    closeModal();
+                    showAlert('Ticker added', 'success');
+                    loadTickers();
+                } catch (e) {
+                    showAlert('Error: ' + e.message, 'error');
+                }
+            });
+        };
+
+        window.editTicker = function(id, message, order, active) {
+            showModal(`
+                <h3 style="margin-bottom:1rem;">Edit Ticker</h3>
+                <input type="text" id="editTickerMessage" value="${message}" required>
+                <input type="number" id="editTickerOrder" value="${order}" min="0">
+                <button class="btn btn-success" id="updateTickerBtn">Update Ticker</button>
+            `);
+            document.getElementById('updateTickerBtn').addEventListener('click', async function() {
+                const newMessage = document.getElementById('editTickerMessage').value.trim();
+                const newOrder = parseInt(document.getElementById('editTickerOrder').value) || 0;
+                if (!newMessage) {
+                    showAlert('Message required', 'error');
+                    return;
+                }
+                try {
+                    await db.collection('tickers').doc(id).update({
+                        message: newMessage,
+                        order: newOrder
+                    });
+                    closeModal();
+                    showAlert('Ticker updated', 'success');
+                    loadTickers();
+                } catch (e) {
+                    showAlert('Error: ' + e.message, 'error');
+                }
+            });
+        };
+
+        window.toggleTickerStatus = async function(id, newStatus) {
+            try {
+                await db.collection('tickers').doc(id).update({ active: newStatus });
+                showAlert(`Ticker ${newStatus ? 'activated' : 'deactivated'}`, 'success');
+                loadTickers();
+            } catch (e) {
+                showAlert('Error: ' + e.message, 'error');
+            }
+        };
+
+        window.deleteTicker = async function(id) {
+            if (!confirm('Delete this ticker?')) return;
+            try {
+                await db.collection('tickers').doc(id).delete();
+                showAlert('Ticker deleted', 'success');
+                loadTickers();
+            } catch (e) {
+                showAlert('Error: ' + e.message, 'error');
+            }
+        };
+
+        window.moveTicker = async function(id, direction) {
+            try {
+                const snapshot = await db.collection('tickers').orderBy('order', 'asc').get();
+                const tickers = [];
+                snapshot.forEach(doc => tickers.push({ id: doc.id, ...doc.data() }));
+                
+                const index = tickers.findIndex(t => t.id === id);
+                if (index === -1) return;
+                
+                const newIndex = direction === 'up' ? index - 1 : index + 1;
+                if (newIndex < 0 || newIndex >= tickers.length) return;
+                
+                const tempOrder = tickers[index].order;
+                const batch = db.batch();
+                batch.update(db.collection('tickers').doc(tickers[index].id), { order: tickers[newIndex].order });
+                batch.update(db.collection('tickers').doc(tickers[newIndex].id), { order: tempOrder });
+                await batch.commit();
+                
+                loadTickers();
+            } catch (e) {
+                showAlert('Error moving ticker: ' + e.message, 'error');
+            }
+        };
+
         // Expose functions globally
         window.showAlert = showAlert;  
         window.showModal = showModal;  
@@ -5826,7 +6261,6 @@
         window.loadDefaultFaqs = loadDefaultFaqs;
         window.loadSampleFeedback = loadSampleFeedback;
         window.toggleMobileMenu = toggleMobileMenu;
-        // New functions
         window.toggleSuspendUser = toggleSuspendUser;
         window.suspendUserTemporarily = suspendUserTemporarily;
         window.unsuspendUser = unsuspendUser;
@@ -5835,6 +6269,42 @@
         window.sendWarning = sendWarning;
         window.unsendWarning = unsendWarning;
         window.clearAutoTickers = clearAutoTickers;
+        window.addWysiwygSection = addWysiwygSection;
+        window.moveWysiwygSection = moveWysiwygSection;
+        window.deleteWysiwygSection = deleteWysiwygSection;
+        window.saveWysiwygHowItWorks = saveWysiwygHowItWorks;
+        window.execCmd = execCmd;
+        window.promptLink = promptLink;
+        window.promptColor = promptColor;
+        window.promptFontSize = promptFontSize;
+        window.showAddTicker = showAddTicker;
+        window.editTicker = editTicker;
+        window.toggleTickerStatus = toggleTickerStatus;
+        window.deleteTicker = deleteTicker;
+        window.moveTicker = moveTicker;
+        window.setTrainingSubTab = setTrainingSubTab;
+        window.showCreateTraining = showCreateTraining;
+        window.addResourceField = addResourceField;
+        window.createTraining = createTraining;
+        window.editTraining = editTraining;
+        window.addEditResourceField = addEditResourceField;
+        window.updateTraining = updateTraining;
+        window.deleteTraining = deleteTraining;
+        window.approveTrainingApplication = approveTrainingApplication;
+        window.rejectTrainingApplication = rejectTrainingApplication;
+        window.showAddLeaderboardEntry = showAddLeaderboardEntry;
+        window.editLeaderboardEntry = editLeaderboardEntry;
+        window.deleteLeaderboardEntry = deleteLeaderboardEntry;
+        window.generateLeaderboardFromUsers = generateLeaderboardFromUsers;
+        window.showAddFaq = showAddFaq;
+        window.editFaq = editFaq;
+        window.deleteFaq = deleteFaq;
+        window.showAddFeedback = showAddFeedback;
+        window.deleteFeedback = deleteFeedback;
+        window.savePaymentUrl = savePaymentUrl;
+        window.viewPetition = viewPetition;
+        window.replyToPetition = replyToPetition;
+        window.sendPetitionReply = sendPetitionReply;
     </script>  
 </body>  
 </html>
