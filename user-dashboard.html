@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -285,7 +286,7 @@
         .filter-tag { background: #e2e8f0; padding: 0.2rem 0.6rem; border-radius: 40px; font-size: 0.65rem; display: flex; align-items: center; gap: 0.2rem; }
         .filter-tag i { cursor: pointer; color: #ef4444; margin-left: 0.2rem; }
 
-        /* ==================== TASK GRID – now all cards have consistent light background ==================== */
+        /* ==================== TASK GRID – all cards have consistent light background ==================== */
         .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
         .task-card { 
             background: white; 
@@ -1059,7 +1060,7 @@
 
         // ==================== OFFER FEATURE ====================
         let currentOffer = null; // active membership offer
-        const OFFER_POPUP_COOLDOWN = 30 * 60 * 1000; // 30 minutes
+        const OFFER_POPUP_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
         // ==================== USD to KSH conversion ====================
         let usdToKshRate = 130; // default, can be overridden from Firestore
@@ -3028,17 +3029,24 @@
                     hist += '</div>'; 
                 } 
                 document.getElementById('content').innerHTML = ws + hist; 
-                toggleWithdrawalFields(); // ensure correct fields are shown initially
+                // Only call toggleWithdrawalFields if elements exist
+                if (document.getElementById('withdrawMethod')) {
+                    toggleWithdrawalFields(); // ensure correct fields are shown initially
+                }
             } catch (e) { 
                 document.getElementById('content').innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${e.message}</p><button class="btn btn-primary" onclick="loadWithdrawals()">Retry</button></div>`; 
             } 
         }
 
         function toggleWithdrawalFields() {
-            const method = document.getElementById('withdrawMethod')?.value;
+            const method = document.getElementById('withdrawMethod');
             const mobileDiv = document.getElementById('mobileFields');
             const bankDiv = document.getElementById('bankFields');
-            if (method === 'Bank Transfer') {
+            
+            // Add null checks to prevent "cannot read properties of null" error
+            if (!method || !mobileDiv || !bankDiv) return;
+            
+            if (method.value === 'Bank Transfer') {
                 mobileDiv.style.display = 'none';
                 bankDiv.style.display = 'block';
             } else {
@@ -4043,11 +4051,11 @@
                 await loadActiveOffer();
                 // ===== SHOW OFFER POPUP IF APPLICABLE =====
                 checkAndShowOfferPopup();
-                // Set interval to re-check offer and popup every 30 minutes
+                // Set interval to re-check offer and popup every 5 minutes (300000 ms)
                 setInterval(() => {
                     loadActiveOffer();
                     checkAndShowOfferPopup();
-                }, 30 * 60 * 1000); // 30 minutes
+                }, 300000); // 5 minutes
 
                 setupTicker();
                 setupMessageCounter(); setupWalletListener(); setupNotificationsListener();
@@ -4130,3 +4138,4 @@
     </script>
 </body>
 </html>
+```
