@@ -627,6 +627,10 @@
         db.enablePersistence().catch(console.log);
 
         // ==================== CONSTANTS ====================
+        const DAILY_TASK_LIMIT = 3;                // max tasks per day
+        const MAX_CONCURRENT_TASKS = 1;            // only one active task
+        const TASKS_CACHE_TTL = 5 * 60 * 1000;     // 5 minutes cache
+        const TASK_CANCEL_COOLDOWN_MINUTES = 30;   // 30 min cooldown
         let TRANSACTION_FEE_PERCENT = 3, PLATFORM_FEE_PERCENT = 2, TOTAL_FEE_PERCENT = 5;
         let MIN_WITHDRAWAL = 0.001;
         const MEMBERSHIP_TYPES = { BASIC: 'basic', PREMIUM: 'premium', ELITE: 'elite' };
@@ -670,6 +674,7 @@
         let currentTab = 'tasks';
         let adminId = null;
         let acceptedTasksListener = null;
+        let acceptedTasksCount = 0;                 // current number of accepted tasks (active)
         const userCache = new Map();
         let shownWarningIds = new Set();
         let shownPaymentApprovalIds = new Set();
@@ -679,13 +684,12 @@
         let nextAllowedWithdrawalTime = null;
 
         // ==================== PAGINATION & CACHING ====================
-        const PAGE_SIZE = 15;
+        const PAGE_SIZE = 5;                         // load 5 tasks at a time
         let lastTaskDoc = null;
         let allTasksLoaded = false;
         let isLoadingTasks = false;
         let tasksCache = null;
         let tasksCacheTimestamp = 0;
-        const TASKS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
         let taskListType = 'all';
         let taskQueryConstraints = [];
         let observer = null;
@@ -1224,6 +1228,13 @@
             await loadInitialTasks();
         }
 
+        function refreshTasks() {
+            tasksCache = null;
+            lastTaskDoc = null;
+            allTasksLoaded = false;
+            loadTasks(true);
+        }
+
         async function loadTasksByCategory(category) {
             if (category === 'design' || category === 'projects' || category === 'transcription') {
                 if (!userData || userData.membershipType !== MEMBERSHIP_TYPES.ELITE) {
@@ -1418,6 +1429,7 @@
                     <div class="filter-group"><label>Difficulty</label><select id="difficultyFilter" class="filter-select" onchange="debouncedApplyFilters()">${options(['all','beginner','medium','hard'])}</select></div>
                     <div class="filter-group"><label>Sort By</label><select id="sortFilter" class="filter-select" onchange="debouncedApplyFilters()">${options(['newest','oldest','amount-high','amount-low','deadline-urgent'])}</select></div>
                     <div class="filter-actions">
+                        <button class="filter-btn apply" onclick="refreshTasks()"><i class="fas fa-sync-alt"></i> Refresh</button>
                         <button class="filter-btn reset" onclick="resetFilters()"><i class="fas fa-redo-alt"></i> Reset</button>
                     </div>
                 </div>
@@ -1675,6 +1687,35 @@
                 return;
             }
 
+            // --- COOLDOWN CHECK ---
+            if (userData.taskCancelCooldownUntil) {
+                const cooldownUntil = userData.taskCancelCooldownUntil.toDate ? userData.taskCancelCooldownUntil.toDate() : new Date(userData.taskCancelCooldownUntil);
+                const now = new Date();
+                if (cooldownUntil > now) {
+                    const minutesLeft = Math.ceil((cooldownUntil - now) / (60 * 1000));
+                    showAlert(`You canceled a task recently. Please wait ${minutesLeft} minute(s) before accepting a new task.`, 'error');
+                    return;
+                }
+            }
+
+            // --- CONCURRENT TASK LIMIT ---
+            if (acceptedTasksCount >= MAX_CONCURRENT_TASKS) {
+                showAlert(`You already have an active task. Please submit or cancel it before accepting a new one.`, 'error');
+                return;
+            }
+
+            // --- DAILY LIMIT ---
+            const today = new Date().toDateString();
+            if (userData.lastAcceptedDate !== today) {
+                // New day – reset counter later in transaction
+                userData.acceptedToday = 0;
+                userData.lastAcceptedDate = today;
+            }
+            if (userData.acceptedToday >= DAILY_TASK_LIMIT) {
+                showAlert(`You have reached the daily limit of ${DAILY_TASK_LIMIT} tasks. Please try again tomorrow.`, 'error');
+                return;
+            }
+
             try {
                 const taskRef = db.collection('tasks').doc(taskId);
                 const taskDoc = await taskRef.get();
@@ -1766,6 +1807,13 @@
                         clientName: taskData.clientName,
                         acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
+
+                    // Update daily counter in user doc
+                    const userRef = db.collection('users').doc(currentUser.uid);
+                    transaction.update(userRef, {
+                        acceptedToday: firebase.firestore.FieldValue.increment(1),
+                        lastAcceptedDate: today
+                    });
                 });
 
                 closeModal();
@@ -1824,10 +1872,26 @@
                     transaction.update(taskRef, { acceptedCount: firebase.firestore.FieldValue.increment(-1) });
                     transaction.delete(userAcceptRef);
                     transaction.delete(userAcceptedTaskRef);
+
+                    // Decrement daily counter if today
+                    const today = new Date().toDateString();
+                    if (userData.lastAcceptedDate === today) {
+                        transaction.update(db.collection('users').doc(currentUser.uid), {
+                            acceptedToday: firebase.firestore.FieldValue.increment(-1)
+                        });
+                    }
                 });
 
+                // --- SET COOLDOWN ---
+                const cooldownUntil = new Date(Date.now() + TASK_CANCEL_COOLDOWN_MINUTES * 60 * 1000);
+                await db.collection('users').doc(currentUser.uid).update({
+                    taskCancelCooldownUntil: firebase.firestore.Timestamp.fromDate(cooldownUntil)
+                });
+                // Update local userData
+                userData.taskCancelCooldownUntil = firebase.firestore.Timestamp.fromDate(cooldownUntil);
+
                 closeModal();
-                showAlert('Task acceptance cancelled successfully.', 'success');
+                showAlert('Task acceptance cancelled successfully. You cannot accept new tasks for 30 minutes.', 'success');
 
                 if (currentTab === 'submit') {
                     loadPendingSubmissions();
@@ -3323,6 +3387,8 @@
                         referralEarnings: 0,
                         newbieQualified: false,
                         newbieAttempts: 0,
+                        acceptedToday: 0,
+                        lastAcceptedDate: null,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     if (referredBy) {
@@ -3338,6 +3404,9 @@
                     userData = { id: user.uid, ...newDoc.data() };
                 } else {
                     userData = { id: user.uid, ...doc.data() };
+                    // Ensure missing fields
+                    if (userData.acceptedToday === undefined) { await db.collection('users').doc(user.uid).update({ acceptedToday: 0 }); userData.acceptedToday = 0; }
+                    if (userData.lastAcceptedDate === undefined) { await db.collection('users').doc(user.uid).update({ lastAcceptedDate: null }); userData.lastAcceptedDate = null; }
                     if (userData.frozen === undefined) { await db.collection('users').doc(user.uid).update({ frozen: false }); userData.frozen = false; }
                     if (userData.suspended === undefined) { await db.collection('users').doc(user.uid).update({ suspended: false }); userData.suspended = false; }
                     if (userData.suspendedReason === undefined) { await db.collection('users').doc(user.uid).update({ suspendedReason: '' }); userData.suspendedReason = ''; }
@@ -3405,8 +3474,8 @@
         function setupAcceptedTasksListener() {
             if (acceptedTasksListener) acceptedTasksListener();
             acceptedTasksListener = db.collection('users').doc(currentUser.uid).collection('acceptedTasks').onSnapshot(snap => {
-                const count = snap.size;
-                ['desktopSubmitBadge', 'mobileSubmitBadge', 'bottomSubmitBadge'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = count; el.style.display = count ? 'inline' : 'none'; } });
+                acceptedTasksCount = snap.size;
+                ['desktopSubmitBadge', 'mobileSubmitBadge', 'bottomSubmitBadge'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = acceptedTasksCount; el.style.display = acceptedTasksCount ? 'inline' : 'none'; } });
                 refreshMirror();
             }, console.error);
         }
