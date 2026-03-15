@@ -1299,7 +1299,7 @@
             isLoadingTasks = true;
 
             try {
-                let queryRef = db.collection('tasks-summary');
+                let queryRef = db.collection('tasks');  // FIXED: use 'tasks' not 'tasks-summary'
                 for (let constraint of taskQueryConstraints) {
                     if (constraint.op === 'orderBy') {
                         queryRef = queryRef.orderBy(constraint.field, constraint.direction);
@@ -1358,7 +1358,7 @@
                 setupInfiniteScroll();
             } catch (error) {
                 console.error('Error loading tasks:', error);
-                showAlert('Failed to load tasks. Please try again.', 'error');
+                showAlert('Failed to load tasks. Please try again. (' + error.message + ')', 'error');
             } finally {
                 isLoadingTasks = false;
             }
