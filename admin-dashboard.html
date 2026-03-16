@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1624,6 +1623,7 @@
         }
 
         // NEW: Helper function to add a survey question field in create/edit
+        // MODIFIED: Default to multipleChoice and show options immediately
         function addSurveyQuestion(containerId, questionData = null) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -1633,7 +1633,8 @@
             questionDiv.dataset.index = index;
             
             const questionText = questionData ? questionData.questionText : '';
-            const type = questionData ? questionData.type : 'text';
+            // Default to multipleChoice for new questions so options area is visible immediately
+            const type = questionData ? questionData.type : 'multipleChoice';
             const options = questionData && questionData.options ? questionData.options : [];
             const correctAnswer = questionData ? questionData.correctAnswer || '' : '';
             const points = questionData ? questionData.points || 1 : 1;
@@ -8253,4 +8254,3 @@
     </script>  
 </body>  
 </html>
-```
