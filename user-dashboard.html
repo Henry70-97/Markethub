@@ -2922,7 +2922,7 @@
             }
         }
 
-        // ==================== NEWBIE TRAINER (TIMED, MULTIPLE ANSWERS) ====================
+        // ==================== NEWBIE TRAINER (TIMED, MULTIPLE ANSWERS) - FIXED NESTED ARRAYS ====================
         async function loadNewbieTrainer() {
             currentTaskViewed = null;
             refreshMirror();
@@ -3033,12 +3033,22 @@
 
             questions.forEach((q, index) => {
                 const savedAnswer = previousAnswers ? previousAnswers[index] : '';
+                // Prepare saved answer array for multiple choice (both old array and new string formats)
+                let savedAnswerArray = [];
+                if (savedAnswer) {
+                    if (Array.isArray(savedAnswer)) {
+                        savedAnswerArray = savedAnswer; // old format (array)
+                    } else {
+                        savedAnswerArray = savedAnswer.split(',').map(s => s.trim()); // new format (string)
+                    }
+                }
+
                 let inputHtml = '';
                 if (q.type === 'multipleChoice' && q.options) {
                     // Multiple choice: checkboxes (multiple answers allowed)
                     let optionsHtml = '';
                     q.options.forEach(opt => {
-                        const checked = savedAnswer && savedAnswer.includes(opt) ? 'checked' : '';
+                        const checked = savedAnswerArray.includes(opt) ? 'checked' : '';
                         optionsHtml += `
                             <label class="geopay-option-item">
                                 <input type="checkbox" name="q${index}" value="${escapeHtml(opt)}" ${checked}>
@@ -3051,7 +3061,10 @@
                     // Single choice: radio buttons
                     let optionsHtml = '';
                     q.options.forEach(opt => {
-                        const checked = savedAnswer && savedAnswer === opt ? 'checked' : '';
+                        // Determine checked: if savedAnswer is array, take first element; else compare directly
+                        const isChecked = savedAnswer ? 
+                            (Array.isArray(savedAnswer) ? savedAnswer[0] === opt : savedAnswer === opt) : false;
+                        const checked = isChecked ? 'checked' : '';
                         optionsHtml += `
                             <label class="geopay-option-item">
                                 <input type="radio" name="q${index}" value="${escapeHtml(opt)}" ${checked}>
@@ -3110,7 +3123,7 @@
             return formHtml + script;
         }
 
-        // ==================== UPDATED NEWBIE SUBMIT FUNCTION WITH BETTER ERROR HANDLING ====================
+        // ==================== UPDATED NEWBIE SUBMIT FUNCTION WITH NESTED ARRAY FIX ====================
         async function submitNewbieAnswers(questions) {
             // Validate questions array
             if (!questions || !Array.isArray(questions) || questions.length === 0) {
@@ -3129,7 +3142,8 @@
                         showAlert(`Please answer question ${i+1}.`, 'error');
                         return;
                     }
-                    answers.push(selected); // store array for multiple choice
+                    // Store as comma-separated string instead of array
+                    answers.push(selected.join(', '));
                 } else if (q.type === 'singleChoice') {
                     const radio = document.querySelector(`input[name="q${i}"]:checked`);
                     if (!radio) {
@@ -3722,6 +3736,7 @@
             }, 200);
         }
 
+        // ==================== UPDATED: BETTER ERROR LOGGING FOR GEOPAY TASK ====================
         async function startGeoPayTask(taskId, subcategory) {
             closeModal();
 
@@ -3796,8 +3811,9 @@
                 }
 
             } catch (e) {
-                console.error('Error starting GeoPay task:', e);
-                showAlert('Error starting task. Please try again.', 'error');
+                console.error('GeoPay start error:', e);
+                // Show the specific error message to the user
+                showAlert('Error starting task: ' + (e.message || 'Unknown error'), 'error');
             }
         }
 
