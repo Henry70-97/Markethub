@@ -1112,10 +1112,14 @@
                     </div>
                 `;
                 
+                // New "Show Inactive Users" button added here
                 html += `
-                    <div class="search-box">
-                        <input type="text" id="userSearchInput" placeholder="Search by email or name..." onkeyup="filterUsersTable()">
-                        <button class="btn btn-primary" onclick="filterUsersTable()"><i class="fas fa-search"></i> Search</button>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <div class="search-box" style="flex: 1;">
+                            <input type="text" id="userSearchInput" placeholder="Search by email or name..." onkeyup="filterUsersTable()">
+                            <button class="btn btn-primary" onclick="filterUsersTable()"><i class="fas fa-search"></i> Search</button>
+                        </div>
+                        <button class="btn btn-warning" onclick="showInactiveUsers()"><i class="fas fa-user-clock"></i> Show Inactive Users</button>
                     </div>
                 `;
                 html += '<table class="data-table" id="usersTable">'; 
@@ -7600,6 +7604,166 @@
             }
         }
 
+        // ==================== CANCEL TASK ACCEPTANCE ====================
+        window.cancelTaskAcceptance = async function(taskId, userId) {
+            if (!confirm('Cancel this user\'s acceptance? They will be removed from the task and notified.')) return;
+            try {
+                const taskRef = db.collection('tasks').doc(taskId);
+                const acceptRef = taskRef.collection('taskAccepts').doc(userId);
+                const acceptDoc = await acceptRef.get();
+                if (!acceptDoc.exists) {
+                    showAlert('Acceptance record not found', 'error');
+                    return;
+                }
+
+                await db.runTransaction(async (transaction) => {
+                    const taskDoc = await transaction.get(taskRef);
+                    if (!taskDoc.exists) throw new Error('Task not found');
+                    const newCount = Math.max((taskDoc.data().acceptedCount || 0) - 1, 0);
+                    transaction.update(taskRef, { acceptedCount: newCount });
+                    transaction.delete(acceptRef);
+                });
+
+                await sendNotification(userId, 'Task Acceptance Cancelled',
+                    'Your acceptance for a task has been cancelled by admin.', 'warning', `task:${taskId}`);
+
+                showAlert('Acceptance cancelled and user notified', 'success');
+                closeModal();
+                showTaskSubmissions(taskId); // refresh modal
+            } catch (error) {
+                console.error('Error cancelling acceptance:', error);
+                showAlert('Error: ' + error.message, 'error');
+            }
+        };
+
+        // ==================== INACTIVE USERS MANAGEMENT ====================
+        window.showInactiveUsers = async function() {
+            showAlert('Loading inactive users...', 'info');
+            try {
+                const usersSnapshot = await db.collection('users').get();
+                const users = [];
+                usersSnapshot.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
+
+                const now = new Date();
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                const inactiveList = [];
+
+                for (const user of users) {
+                    // Last login
+                    let lastLogin = null;
+                    const loginQuery = await db.collection('userLogins')
+                        .where('userId', '==', user.id)
+                        .orderBy('timestamp', 'desc')
+                        .limit(1)
+                        .get();
+                    if (!loginQuery.empty) lastLogin = loginQuery.docs[0].data().timestamp;
+
+                    // Last submission
+                    let lastSubmission = null;
+                    const subQuery = await db.collection('submissions')
+                        .where('userId', '==', user.id)
+                        .orderBy('submittedAt', 'desc')
+                        .limit(1)
+                        .get();
+                    if (!subQuery.empty) lastSubmission = subQuery.docs[0].data().submittedAt;
+
+                    const hasRecentLogin = lastLogin && lastLogin.toDate() > sevenDaysAgo;
+                    const hasRecentSubmission = lastSubmission && lastSubmission.toDate() > sevenDaysAgo;
+
+                    if (!hasRecentLogin && !hasRecentSubmission) {
+                        inactiveList.push({ ...user, lastLogin, lastSubmission });
+                    }
+                }
+
+                let html = `
+                    <h3 style="margin-bottom:1.5rem;">Inactive Users (no login/submission in last 7 days)</h3>
+                    <button class="btn btn-secondary" onclick="loadUsers()"><i class="fas fa-arrow-left"></i> Back to All Users</button>
+                    <div style="margin:1rem 0; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn btn-danger" onclick="bulkActionInactive('delete')">Delete Selected</button>
+                        <button class="btn btn-warning" onclick="bulkActionInactive('suspend')">Suspend Selected</button>
+                        <button class="btn btn-secondary" onclick="bulkActionInactive('freeze')">Freeze Selected</button>
+                        <button class="btn btn-info" onclick="bulkActionInactive('unsuspend')">Unsuspend Selected</button>
+                        <button class="btn btn-info" onclick="bulkActionInactive('unfreeze')">Unfreeze Selected</button>
+                    </div>
+                    <table class="data-table" id="inactiveUsersTable">
+                        <tr>
+                            <th><input type="checkbox" id="selectAllInactive" onclick="toggleSelectAllInactive()"></th>
+                            <th>Email</th><th>Name</th><th>Wallet</th><th>Membership</th><th>Last Login</th><th>Last Submission</th><th>Actions</th>
+                        </tr>
+                `;
+
+                if (inactiveList.length === 0) {
+                    html += '<tr><td colspan="8" style="text-align:center;">No inactive users found.</td></tr>';
+                } else {
+                    inactiveList.forEach(u => {
+                        const lastLoginStr = u.lastLogin ? formatDate(u.lastLogin) : 'Never';
+                        const lastSubStr = u.lastSubmission ? formatDate(u.lastSubmission) : 'Never';
+                        const membershipClass = u.membershipType === 'elite' ? 'warning' : u.membershipType === 'premium' ? 'primary' : 'info';
+                        html += `
+                            <tr data-user-id="${u.id}">
+                                <td><input type="checkbox" class="inactive-user-checkbox" value="${u.id}"></td>
+                                <td>${u.email}</td>
+                                <td>${u.displayName || ''}</td>
+                                <td>$${u.wallet || 0}</td>
+                                <td><span class="badge ${membershipClass}">${(u.membershipType || 'basic').toUpperCase()}</span></td>
+                                <td>${lastLoginStr}</td>
+                                <td>${lastSubStr}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}', '${u.email}')">Delete</button>
+                                    <button class="btn btn-sm btn-warning" onclick="toggleSuspendUser('${u.id}', ${u.suspended || false})">${u.suspended ? 'Unsuspend' : 'Suspend'}</button>
+                                    <button class="btn btn-sm btn-secondary" onclick="toggleFrozen('${u.id}', ${u.frozen || false})">${u.frozen ? 'Unfreeze' : 'Freeze'}</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+                html += '</table>';
+                document.getElementById('content').innerHTML = html;
+
+                window.toggleSelectAllInactive = function() {
+                    const checkAll = document.getElementById('selectAllInactive').checked;
+                    document.querySelectorAll('.inactive-user-checkbox').forEach(cb => cb.checked = checkAll);
+                };
+            } catch (error) {
+                console.error('Error loading inactive users:', error);
+                showAlert('Error: ' + error.message, 'error');
+            }
+        };
+
+        window.bulkActionInactive = async function(action) {
+            const checkboxes = document.querySelectorAll('.inactive-user-checkbox:checked');
+            if (checkboxes.length === 0) return showAlert('No users selected', 'warning');
+            const userIds = Array.from(checkboxes).map(cb => cb.value);
+            if (!confirm(`${action} ${userIds.length} user(s)?`)) return;
+
+            showAlert(`Processing...`, 'info');
+            try {
+                for (const uid of userIds) {
+                    if (action === 'delete') {
+                        await db.collection('users').doc(uid).delete();
+                    } else if (action === 'suspend') {
+                        await db.collection('users').doc(uid).update({ suspended: true, suspendedReason: 'Inactive account', suspendedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        await sendNotification(uid, 'Account Suspended', 'Your account has been suspended due to inactivity.', 'warning');
+                    } else if (action === 'freeze') {
+                        await db.collection('users').doc(uid).update({ frozen: true });
+                        await sendNotification(uid, 'Account Frozen', 'Your account has been frozen due to inactivity.', 'warning');
+                    } else if (action === 'unsuspend') {
+                        await db.collection('users').doc(uid).update({ suspended: false, suspendedReason: firebase.firestore.FieldValue.delete(), suspendedAt: firebase.firestore.FieldValue.delete() });
+                        await sendNotification(uid, 'Account Unsuspended', 'Your account has been unsuspended.', 'success');
+                    } else if (action === 'unfreeze') {
+                        await db.collection('users').doc(uid).update({ frozen: false });
+                        await sendNotification(uid, 'Account Unfrozen', 'Your account has been unfrozen.', 'success');
+                    }
+                }
+                showAlert('Bulk action completed.', 'success');
+                showInactiveUsers(); // refresh
+            } catch (error) {
+                console.error('Bulk action error:', error);
+                showAlert('Error: ' + error.message, 'error');
+            }
+        };
+
+        // ==================== MODIFIED showTaskSubmissions to include Cancel Acceptance button ====================
         window.showTaskSubmissions = async function(taskId) {
             try {
                 const taskDoc = await db.collection('tasks').doc(taskId).get();
@@ -7647,6 +7811,7 @@
                                 <div class="action-buttons">
                                     <button class="btn btn-warning" onclick="sendWarning('${u.id}', '${task.title.replace(/'/g, "\\'")}')">Send Warning</button>
                                     <button class="btn btn-warning" onclick="toggleSuspendUser('${u.id}', ${!!u.suspended})">${u.suspended ? 'Unsuspend' : 'Suspend'}</button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelTaskAcceptance('${taskId}', '${u.id}')">Cancel Acceptance</button>
                                 </div>
                             </div>
                         `;
@@ -7664,6 +7829,7 @@
                                 <div class="action-buttons">
                                     <button class="btn btn-warning" onclick="sendWarning('${u.id}', '${task.title.replace(/'/g, "\\'")}')">Send Warning</button>
                                     <button class="btn btn-warning" onclick="toggleSuspendUser('${u.id}', ${!!u.suspended})">${u.suspended ? 'Unsuspend' : 'Suspend'}</button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelTaskAcceptance('${taskId}', '${u.id}')">Cancel Acceptance</button>
                                 </div>
                             </div>
                         `;
@@ -8594,6 +8760,11 @@
         window.addSurveyQuestion = addSurveyQuestion;
         window.addOption = addOption;
         window.toggleQuestionOptions = toggleQuestionOptions;
+
+        // New functions for cancel acceptance and inactive users
+        window.cancelTaskAcceptance = cancelTaskAcceptance;
+        window.showInactiveUsers = showInactiveUsers;
+        window.bulkActionInactive = bulkActionInactive;
     </script>  
 </body>  
 </html>
