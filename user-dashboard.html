@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,7 +67,7 @@
 
         .ticker-content {
             display: inline-block;
-            animation: tickerMove 20s linear infinite;
+            animation: tickerMove 40s linear infinite; /* slowed down from 20s to 40s */
             font-weight: 600;
             font-size: 0.9rem;
             letter-spacing: 0.5px;
@@ -89,27 +88,63 @@
             100% { transform: translateX(-100%); }
         }
 
-        /* Admin Alert Pane (uses 'announcements' collection) */
-        .admin-alert-pane {
-            background: #b91c1c;
+        /* Admin Announcements Panel (new) */
+        .admin-announcements-pane {
+            background: #b91c1c;                /* rich red background */
             color: white;
-            font-weight: 800;
-            padding: 0.75rem 1rem;
-            border-radius: 2rem;
-            margin-bottom: 0.8rem;
-            text-align: center;
-            font-size: 1rem;
-            letter-spacing: 0.5px;
-            box-shadow: 0 4px 15px rgba(185, 28, 28, 0.5);
-            border: 1px solid #ffcccc;
-            animation: pulseAlert 2s infinite;
-            display: none;
+            border-radius: 1.5rem;
+            padding: 0.8rem 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid #ffcccc;
+            box-shadow: 0 6px 20px rgba(185, 28, 28, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
         }
 
-        @keyframes pulseAlert {
-            0% { opacity: 1; }
-            50% { opacity: 0.9; }
-            100% { opacity: 1; }
+        .announcements-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .announcements-header .live-badge {
+            background: #ffffff;
+            color: #b91c1c;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.8rem;
+            border-radius: 30px;
+            animation: pulseLive 1.5s infinite;
+            border: 1px solid #ffcccc;
+        }
+
+        .announcements-content {
+            font-weight: 700;
+            font-size: 1.2rem;
+            line-height: 1.5;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            min-height: 3.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 1rem;
+            padding: 0.6rem 1rem;
+            text-align: center;
+            word-break: break-word;
+        }
+
+        /* Ensure the live badge animation is defined */
+        @keyframes pulseLive {
+            0% { opacity: 1; background-color: #ffffff; }
+            50% { opacity: 0.85; background-color: #ffe6e6; }
+            100% { opacity: 1; background-color: #ffffff; }
         }
 
         /* News / Mirror TV */
@@ -300,12 +335,6 @@
         .mirror-tab-stat-value {
             font-weight: 700;
             color: var(--gold);
-        }
-
-        @keyframes pulseLive {
-            0% { opacity: 1; background-color: #b8860b; }
-            50% { opacity: 0.85; background-color: #c9960c; }
-            100% { opacity: 1; background-color: #b8860b; }
         }
 
         /* Header */
@@ -658,7 +687,7 @@
 
         .ticker-stat-content span {
             display: inline-block;
-            animation: tickerStatMove 12s linear infinite;
+            animation: tickerStatMove 30s linear infinite; /* slowed down from 12s to 30s */
         }
 
         @keyframes tickerStatMove {
@@ -2834,9 +2863,13 @@
         <div class="ticker-content" id="tickerContent"></div>
     </div>
 
-    <!-- Admin Alert Pane (uses 'announcements' collection) -->
-    <div class="admin-alert-pane" id="adminAlertPane" style="display: none;">
-        <div class="alert-content" id="adminAlertMessage"></div>
+    <!-- Admin Announcements Panel (rotating) -->
+    <div class="admin-announcements-pane" id="adminAlertPane" style="display: none;">
+        <div class="announcements-header">
+            <span class="live-badge">🔴 LIVE</span>
+            <span>Admin Announcements</span>
+        </div>
+        <div class="announcements-content" id="adminAlertMessage"></div>
     </div>
 
     <!-- AI Assistant Floating Button -->
@@ -3343,7 +3376,7 @@
                 });
 
                 pane.style.display = 'block';
-                msgDiv.textContent = adminAlerts[0];
+                msgDiv.innerHTML = adminAlerts[0];   // ← changed from textContent to innerHTML
                 alertIndex = 0;
 
                 // Clear existing interval
@@ -3352,7 +3385,7 @@
                 // Rotate every 60 seconds
                 alertInterval = setInterval(() => {
                     alertIndex = (alertIndex + 1) % adminAlerts.length;
-                    msgDiv.textContent = adminAlerts[alertIndex];
+                    msgDiv.innerHTML = adminAlerts[alertIndex]; // ← changed from textContent to innerHTML
                 }, 60000);
             } catch (e) {
                 console.error('Error loading announcements:', e);
@@ -7001,4 +7034,3 @@
     </script>
 </body>
 </html>
-```
