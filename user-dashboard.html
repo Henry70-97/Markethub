@@ -89,6 +89,29 @@
             100% { transform: translateX(-100%); }
         }
 
+        /* Admin Alert Pane (NEW) */
+        .admin-alert-pane {
+            background: #b91c1c;
+            color: white;
+            font-weight: 800;
+            padding: 0.75rem 1rem;
+            border-radius: 2rem;
+            margin-bottom: 0.8rem;
+            text-align: center;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(185, 28, 28, 0.5);
+            border: 1px solid #ffcccc;
+            animation: pulseAlert 2s infinite;
+            display: none;
+        }
+
+        @keyframes pulseAlert {
+            0% { opacity: 1; }
+            50% { opacity: 0.9; }
+            100% { opacity: 1; }
+        }
+
         /* News / Mirror TV */
         .news-tv-container {
             background: #0a0a0f;
@@ -2811,6 +2834,11 @@
         <div class="ticker-content" id="tickerContent"></div>
     </div>
 
+    <!-- Admin Alert Pane (NEW) -->
+    <div class="admin-alert-pane" id="adminAlertPane" style="display: none;">
+        <div class="alert-content" id="adminAlertMessage"></div>
+    </div>
+
     <!-- AI Assistant Floating Button -->
     <div class="ai-assistant-btn" onclick="openAIAssistant()">
         <i class="fas fa-robot"></i>
@@ -3287,6 +3315,48 @@
                 const statTicker = document.getElementById('tickerStatContent');
                 if (statTicker) statTicker.innerHTML = '<span>⚠️ Ticker unavailable</span>';
             });
+        }
+
+        // ==================== ADMIN ALERTS (NEW) ====================
+        let adminAlerts = [];
+        let alertIndex = 0;
+        let alertInterval = null;
+
+        async function loadAdminAlerts() {
+            try {
+                const snapshot = await db.collection('adminAlerts')
+                    .where('active', '==', true)
+                    .orderBy('order', 'asc')
+                    .get();
+
+                const pane = document.getElementById('adminAlertPane');
+                const msgDiv = document.getElementById('adminAlertMessage');
+
+                if (snapshot.empty) {
+                    pane.style.display = 'none';
+                    return;
+                }
+
+                adminAlerts = [];
+                snapshot.forEach(doc => {
+                    adminAlerts.push(doc.data().message);
+                });
+
+                pane.style.display = 'block';
+                msgDiv.textContent = adminAlerts[0];
+                alertIndex = 0;
+
+                // Clear existing interval
+                if (alertInterval) clearInterval(alertInterval);
+
+                // Rotate every 60 seconds
+                alertInterval = setInterval(() => {
+                    alertIndex = (alertIndex + 1) % adminAlerts.length;
+                    msgDiv.textContent = adminAlerts[alertIndex];
+                }, 60000);
+            } catch (e) {
+                console.error('Error loading admin alerts:', e);
+            }
         }
 
         // ==================== FETCH ADMIN ID ====================
@@ -4109,6 +4179,47 @@
             URL.revokeObjectURL(url);
         }
 
+        // ==================== CLEANUP CANCELLED TASKS (NEW) ====================
+        async function cleanupCancelledTasks() {
+            const acceptedRef = db.collection('users').doc(currentUser.uid).collection('acceptedTasks');
+            const acceptedSnap = await acceptedRef.get();
+
+            if (acceptedSnap.empty) return;
+
+            const batch = db.batch();
+            let removedCount = 0;
+
+            for (const doc of acceptedSnap.docs) {
+                const taskId = doc.id;
+                const taskDoc = await db.collection('tasks').doc(taskId).get();
+
+                // If task no longer exists OR is inactive, remove it
+                if (!taskDoc.exists || taskDoc.data().active === false) {
+                    batch.delete(doc.ref);
+                    removedCount++;
+
+                    // Optional: create a notification for the user
+                    await db.collection('notifications').add({
+                        userId: currentUser.uid,
+                        title: 'Task Cancelled',
+                        message: `The task "${doc.data().title || 'Untitled'}" has been cancelled by admin and removed from your list.`,
+                        type: 'warning',
+                        read: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            }
+
+            if (removedCount > 0) {
+                await batch.commit();
+                console.log(`Removed ${removedCount} cancelled tasks.`);
+                // Refresh the submit tab if it's currently open
+                if (currentTab === 'submit') {
+                    loadPendingSubmissions();
+                }
+            }
+        }
+
         // ==================== ACCEPT TASK ====================
         async function acceptTask(taskId) {
             if (userData.suspended) {
@@ -4153,6 +4264,12 @@
                     return;
                 }
                 const task = taskDoc.data();
+
+                // Check if task is active (NEW)
+                if (task.active === false) {
+                    showAlert('This task is no longer available (deactivated by admin).', 'error');
+                    return;
+                }
 
                 const categoriesRequiringTraining = ['writing', 'data-annotations', 'ai_annotation'];
                 if (categoriesRequiringTraining.includes(task.category) && !userData.newbieQualified) {
@@ -4282,7 +4399,21 @@
         async function showSubmitForm(taskId, existingWork = '') {
             try {
                 const taskDoc = await db.collection('tasks').doc(taskId).get();
+                if (!taskDoc.exists) {
+                    showAlert('Task not found', 'error');
+                    return;
+                }
                 const task = taskDoc.data();
+
+                // Check if task is still active (NEW)
+                if (task.active === false) {
+                    showAlert('This task has been cancelled by admin and cannot be submitted.', 'error');
+                    // Remove from accepted tasks
+                    await db.collection('users').doc(currentUser.uid).collection('acceptedTasks').doc(taskId).delete();
+                    if (currentTab === 'submit') loadPendingSubmissions();
+                    return;
+                }
+
                 if (isDeadlinePassed(task.deadline)) {
                     showAlert('Task expired', 'error');
                     return;
@@ -4431,7 +4562,7 @@
                 const taskDoc = await db.collection('tasks').doc(taskId).get();
                 const task = taskDoc.data();
                 sessionStorage.setItem('pendingSubmission', JSON.stringify({ taskId, work, wc, designLink }));
-                showModal(`<div class="modal-content" style="max-width:700px;"><div style="background:linear-gradient(135deg,#6366f1,#8b5cf6); padding:2rem; color:white; border-radius:1rem 1rem 0 0; margin:-2rem -2rem 1.5rem -2rem;"><h3 style="font-size:1.5rem;">Preview Your Submission</h3><p>${escapeHtml(task.title)}</p><div style="display:flex; gap:1rem; margin-top:1rem;"><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-user-circle"></i> ${escapeHtml(task.clientName||'Admin')}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-tag"></i> ${formatBoth(parseFloat(task.reward)||0)}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-file-word"></i> ${wc} words</span></div></div><div style="margin-bottom:1.5rem;"><h4><i class="fas fa-pencil-alt" style="color:#6366f1;"></i> Your Work:</h4><div style="background:#f8fafc; padding:1.5rem; border-left:4px solid #6366f1; max-height:300px; overflow-y:auto;">${work.replace(/\n/g,'<br>')}</div></div>${designLink ? `<div style="margin-bottom:1.5rem;"><h4><i class="fas fa-link" style="color:#6366f1;"></i> Design Link:</h4><div style="background:#f8fafc; padding:0.8rem; border-left:4px solid #10b981;">${escapeHtml(designLink)}</div></div>` : ''}<div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:1rem; border-radius:0.5rem; margin-bottom:1.5rem;"><i class="fas fa-info-circle" style="color:#f59e0b;"></i> Please review carefully. Once submitted, you cannot edit.</div><div style="display:flex; gap:1rem;"><button class="btn btn-success" onclick="saveSubmission('${taskId}')">Confirm & Submit</button><button class="btn btn-primary" onclick="showSubmitForm('${taskId}', ${JSON.stringify(work)})">Edit</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button></div></div>`);
+                showModal(`<div class="modal-content" style="max-width:700px;"><div style="background:linear-gradient(135deg,#6366f1,#8b5cf6); padding:2rem; color:white; border-radius:1rem 0 0 1rem; margin:-2rem -2rem 1.5rem -2rem;"><h3 style="font-size:1.5rem;">Preview Your Submission</h3><p>${escapeHtml(task.title)}</p><div style="display:flex; gap:1rem; margin-top:1rem;"><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-user-circle"></i> ${escapeHtml(task.clientName||'Admin')}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-tag"></i> ${formatBoth(parseFloat(task.reward)||0)}</span><span style="background:rgba(255,255,255,0.2); padding:0.3rem 1rem; border-radius:40px;"><i class="fas fa-file-word"></i> ${wc} words</span></div></div><div style="margin-bottom:1.5rem;"><h4><i class="fas fa-pencil-alt" style="color:#6366f1;"></i> Your Work:</h4><div style="background:#f8fafc; padding:1.5rem; border-left:4px solid #6366f1; max-height:300px; overflow-y:auto;">${work.replace(/\n/g,'<br>')}</div></div>${designLink ? `<div style="margin-bottom:1.5rem;"><h4><i class="fas fa-link" style="color:#6366f1;"></i> Design Link:</h4><div style="background:#f8fafc; padding:0.8rem; border-left:4px solid #10b981;">${escapeHtml(designLink)}</div></div>` : ''}<div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:1rem; border-radius:0.5rem; margin-bottom:1.5rem;"><i class="fas fa-info-circle" style="color:#f59e0b;"></i> Please review carefully. Once submitted, you cannot edit.</div><div style="display:flex; gap:1rem;"><button class="btn btn-success" onclick="saveSubmission('${taskId}')">Confirm & Submit</button><button class="btn btn-primary" onclick="showSubmitForm('${taskId}', ${JSON.stringify(work)})">Edit</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button></div></div>`);
             } catch (e) {
                 showAlert('Error previewing','error');
             }
@@ -4625,6 +4756,9 @@
 
         // ==================== PENDING SUBMISSIONS (UPDATED: Cancel button removed) ====================
         async function loadPendingSubmissions() {
+            // Clean up cancelled tasks first
+            await cleanupCancelledTasks();
+
             currentTaskViewed = null; refreshMirror();
             document.getElementById('content').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading pending submissions...</p></div>';
             try {
@@ -6734,6 +6868,8 @@
                 }, 300000);
 
                 setupTicker();
+                // Load admin alerts (NEW)
+                await loadAdminAlerts();
                 setupMessageCounter(); setupWalletListener(); setupNotificationsListener();
                 setupAcceptedTasksListener();
                 setupMembershipPaymentsListener();
