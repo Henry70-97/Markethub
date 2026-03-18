@@ -89,7 +89,7 @@
             100% { transform: translateX(-100%); }
         }
 
-        /* Admin Alert Pane (NEW) */
+        /* Admin Alert Pane (uses 'announcements' collection) */
         .admin-alert-pane {
             background: #b91c1c;
             color: white;
@@ -2834,7 +2834,7 @@
         <div class="ticker-content" id="tickerContent"></div>
     </div>
 
-    <!-- Admin Alert Pane (NEW) -->
+    <!-- Admin Alert Pane (uses 'announcements' collection) -->
     <div class="admin-alert-pane" id="adminAlertPane" style="display: none;">
         <div class="alert-content" id="adminAlertMessage"></div>
     </div>
@@ -3317,14 +3317,14 @@
             });
         }
 
-        // ==================== ADMIN ALERTS (NEW) ====================
+        // ==================== ADMIN ANNOUNCEMENTS (from 'announcements' collection) ====================
         let adminAlerts = [];
         let alertIndex = 0;
         let alertInterval = null;
 
         async function loadAdminAlerts() {
             try {
-                const snapshot = await db.collection('adminAlerts')
+                const snapshot = await db.collection('announcements')  // ← changed from 'adminAlerts' to 'announcements'
                     .where('active', '==', true)
                     .orderBy('order', 'asc')
                     .get();
@@ -3355,7 +3355,7 @@
                     msgDiv.textContent = adminAlerts[alertIndex];
                 }, 60000);
             } catch (e) {
-                console.error('Error loading admin alerts:', e);
+                console.error('Error loading announcements:', e);
             }
         }
 
@@ -6868,7 +6868,7 @@
                 }, 300000);
 
                 setupTicker();
-                // Load admin alerts (NEW)
+                // Load admin alerts (NEW) - now using 'announcements' collection
                 await loadAdminAlerts();
                 setupMessageCounter(); setupWalletListener(); setupNotificationsListener();
                 setupAcceptedTasksListener();
