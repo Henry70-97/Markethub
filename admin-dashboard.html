@@ -8839,6 +8839,19 @@
             }
         };
 
+        // ==================== ATTACH MISSING EVENT LISTENERS ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', logout);
+            }
+
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            if (closeModalBtn) {
+                closeModalBtn.addEventListener('click', closeModal);
+            }
+        });
+
         // Expose functions globally
         window.showAlert = showAlert;  
         window.showModal = showModal;  
