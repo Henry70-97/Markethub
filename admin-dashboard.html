@@ -1926,7 +1926,7 @@
                 let html = ` 
                     <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;"> 
                         <h3>Task Management</h3> 
-                        <button class="btn btn-primary" id="createTaskBtn">+ New Task</button> 
+                        <button class="btn btn-primary" onclick="showCreateTask()">+ New Task</button> 
                     </div> 
                     <table class="data-table"> 
                     <tr><th>Title</th><th>Client</th><th>Reward</th><th>Deadline</th><th>Category</th><th>Subcategory</th><th>Audio</th><th>AI Annotation</th><th>Collab</th><th>Assigned To</th><th>Submissions</th><th>Acceptances</th><th>Status</th><th>Actions</th></tr> 
@@ -8839,7 +8839,7 @@
             }
         };
 
-        // ==================== ATTACH MISSING EVENT LISTENERS ====================
+        // ==================== EVENT DELEGATION FOR CLASS-BASED BUTTONS ====================
         document.addEventListener('DOMContentLoaded', function() {
             const logoutBtn = document.getElementById('logoutBtn');
             if (logoutBtn) {
@@ -8850,9 +8850,190 @@
             if (closeModalBtn) {
                 closeModalBtn.addEventListener('click', closeModal);
             }
+
+            // Event delegation for all class‑based buttons inside #content
+            document.getElementById('content').addEventListener('click', function(e) {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                // ===== USERS =====
+                if (target.classList.contains('toggle-status-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const newStatus = target.dataset.newStatus === 'true';
+                    toggleUserStatus(userId, newStatus);
+                }
+                else if (target.classList.contains('adjust-wallet-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const userName = target.dataset.userName;
+                    const wallet = parseFloat(target.dataset.wallet);
+                    showAdjustWallet(userId, userName, wallet);
+                }
+                else if (target.classList.contains('make-admin-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    makeAdmin(userId);
+                }
+                else if (target.classList.contains('demote-admin-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const userEmail = target.dataset.userEmail;
+                    demoteAdmin(userId, userEmail);
+                }
+                else if (target.classList.contains('toggle-verified-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const newStatus = target.dataset.newStatus === 'true';
+                    toggleVerified(userId, newStatus);
+                }
+                else if (target.classList.contains('toggle-frozen-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const newStatus = target.dataset.newStatus === 'true';
+                    toggleFrozen(userId, newStatus);
+                }
+                else if (target.classList.contains('delete-user-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const userEmail = target.dataset.userEmail;
+                    deleteUser(userId, userEmail);
+                }
+                else if (target.classList.contains('change-membership-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const currentType = target.dataset.currentType;
+                    showChangeMembership(userId, currentType);
+                }
+                else if (target.classList.contains('reset-password-btn')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const userEmail = target.dataset.userEmail;
+                    resetUserPassword(userId, userEmail);
+                }
+
+                // ===== TASKS =====
+                else if (target.classList.contains('edit-task-btn')) {
+                    e.preventDefault();
+                    const taskId = target.dataset.taskId;
+                    editTask(taskId);
+                }
+                else if (target.classList.contains('view-requirements-btn')) {
+                    e.preventDefault();
+                    const taskId = target.dataset.taskId;
+                    viewRequirements(taskId);
+                }
+                else if (target.classList.contains('toggle-task-btn')) {
+                    e.preventDefault();
+                    const taskId = target.dataset.taskId;
+                    const newStatus = target.dataset.newStatus === 'true';
+                    toggleTask(taskId, newStatus);
+                }
+
+                // ===== SUBMISSIONS =====
+                else if (target.classList.contains('approve-submission')) {
+                    e.preventDefault();
+                    const subId = target.dataset.subId;
+                    reviewSubmission(subId, true);
+                }
+                else if (target.classList.contains('reject-submission')) {
+                    e.preventDefault();
+                    const subId = target.dataset.subId;
+                    reviewSubmission(subId, false);
+                }
+                else if (target.classList.contains('revert-submission')) {
+                    e.preventDefault();
+                    const subId = target.dataset.subId;
+                    const userId = target.dataset.userId;
+                    const amount = parseFloat(target.dataset.amount);
+                    const taskTitle = target.dataset.taskTitle;
+                    revertSubmission(subId, userId, amount, taskTitle);
+                }
+
+                // ===== WITHDRAWALS =====
+                else if (target.classList.contains('process-withdrawal')) {
+                    e.preventDefault();
+                    const withdrawalId = target.dataset.withdrawalId;
+                    processWithdrawal(withdrawalId);
+                }
+                else if (target.classList.contains('reject-withdrawal')) {
+                    e.preventDefault();
+                    const withdrawalId = target.dataset.withdrawalId;
+                    rejectWithdrawal(withdrawalId);
+                }
+                else if (target.classList.contains('revert-withdrawal')) {
+                    e.preventDefault();
+                    const withdrawalId = target.dataset.withdrawalId;
+                    const userId = target.dataset.userId;
+                    const amount = parseFloat(target.dataset.amount);
+                    revertWithdrawal(withdrawalId, userId, amount);
+                }
+
+                // ===== MEMBERSHIPS =====
+                else if (target.classList.contains('approve-membership')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const paymentId = target.dataset.paymentId;
+                    approveMembership(userId, paymentId);
+                }
+                else if (target.classList.contains('reject-membership')) {
+                    e.preventDefault();
+                    const userId = target.dataset.userId;
+                    const paymentId = target.dataset.paymentId;
+                    rejectMembership(userId, paymentId);
+                }
+                else if (target.classList.contains('revert-membership')) {
+                    e.preventDefault();
+                    const paymentId = target.dataset.paymentId;
+                    const userId = target.dataset.userId;
+                    const amount = parseFloat(target.dataset.amount);
+                    const credited = target.dataset.credited === 'true';
+                    revertMembership(paymentId, userId, amount, credited);
+                }
+
+                // ===== INVESTOR =====
+                else if (target.classList.contains('approve-investor-deposit') || target.matches('[onclick*="approveInvestorDeposit"]')) {
+                    // Handled by inline onclick, but we keep class fallback
+                    // Already handled via onclick attribute
+                }
+                // Add other investor class handlers if needed
+            });
+
+            // Also handle inline clicks for message/notification buttons
+            document.getElementById('individualMessageBtn')?.addEventListener('click', function() {
+                currentMessageType = 'individual';
+                document.getElementById('individualMessageForm').style.display = 'block';
+                document.getElementById('broadcastMessageForm').style.display = 'none';
+                document.getElementById('individualMessageBtn').classList.add('btn-primary');
+                document.getElementById('broadcastMessageBtn').classList.remove('btn-primary');
+            });
+
+            document.getElementById('broadcastMessageBtn')?.addEventListener('click', function() {
+                currentMessageType = 'broadcast';
+                document.getElementById('individualMessageForm').style.display = 'none';
+                document.getElementById('broadcastMessageForm').style.display = 'block';
+                document.getElementById('broadcastMessageBtn').classList.add('btn-primary');
+                document.getElementById('individualMessageBtn').classList.remove('btn-primary');
+            });
+
+            document.getElementById('individualNotificationBtn')?.addEventListener('click', function() {
+                document.getElementById('individualNotificationForm').style.display = 'block';
+                document.getElementById('broadcastNotificationForm').style.display = 'none';
+            });
+
+            document.getElementById('broadcastNotificationBtn')?.addEventListener('click', function() {
+                document.getElementById('broadcastNotificationForm').style.display = 'block';
+                document.getElementById('individualNotificationForm').style.display = 'none';
+            });
+
+            document.getElementById('sendMessageBtn')?.addEventListener('click', sendMessage);
+            document.getElementById('sendBroadcastBtn')?.addEventListener('click', sendBroadcast);
+            document.getElementById('previewBroadcastBtn')?.addEventListener('click', previewBroadcast);
+            document.getElementById('sendIndividualNotifBtn')?.addEventListener('click', sendIndividualNotification);
+            document.getElementById('sendBroadcastNotifBtn')?.addEventListener('click', sendBroadcastNotification);
         });
 
-        // Expose functions globally
+        // ==================== EXPOSE GLOBALLY ====================
         window.showAlert = showAlert;  
         window.showModal = showModal;  
         window.closeModal = closeModal;  
