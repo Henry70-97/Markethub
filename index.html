@@ -521,11 +521,25 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         
+        // Helper: Generate referral code from user ID
         function generateReferralCode(userId) {
             return userId.substring(0, 8).toUpperCase();
         }
         
-        // Get referral code from URL (supports ?ref=CODE or /ref/CODE)
+        // Public lookup of referral info – uses the public referralInfo collection
+        async function getUserByReferralCode(code) {
+            try {
+                const doc = await db.collection('referralInfo').doc(code).get();
+                if (doc.exists) {
+                    return { id: doc.id, ...doc.data() };
+                }
+            } catch (error) {
+                console.warn('Referral lookup failed:', error);
+            }
+            return null;
+        }
+        
+        // Extract referral code from URL
         function getReferralCodeFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const queryRef = urlParams.get('ref');
@@ -540,32 +554,22 @@
             return null;
         }
         
-        // Query Firestore for a user by referralCode (efficient)
-        async function getUserByReferralCode(code) {
-            const snapshot = await db.collection('users')
-                .where('referralCode', '==', code)
-                .limit(1)
-                .get();
-            if (!snapshot.empty) {
-                const doc = snapshot.docs[0];
-                return { id: doc.id, ...doc.data() };
-            }
-            return null;
-        }
-        
+        // Check for referrer on page load
         async function checkForReferrer() {
             const refCode = getReferralCodeFromUrl();
             if (!refCode) return;
             sessionStorage.setItem('pendingReferral', refCode);
-            const user = await getUserByReferralCode(refCode);
-            if (user) {
-                const name = user.displayName || 'a NextGen user';
+            try {
+                const user = await getUserByReferralCode(refCode);
+                const name = user ? (user.displayName || 'a NextGen user') : 'a NextGen user';
                 showReferrerMessage(name);
-            } else {
+            } catch (e) {
+                console.error('Referral error:', e);
                 showReferrerMessage('a NextGen user');
             }
         }
         
+        // Display referrer message in UI
         function showReferrerMessage(name) {
             document.getElementById('referrerMessageContainer').innerHTML = `
                 <div class="referrer-message">
@@ -586,6 +590,7 @@
             });
         }
         
+        // Run referrer check when page loads
         document.addEventListener('DOMContentLoaded', checkForReferrer);
         
         // UI helpers
@@ -602,6 +607,7 @@
             document.getElementById('overlay').classList.remove('show');
         }
         
+        // Tab switching
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
@@ -678,6 +684,7 @@
             }
         }
         
+        // ========== REGISTRATION (Email) – UPDATED ==========
         async function handleRegister() {
             const name = document.getElementById('regName').value;
             const email = document.getElementById('regEmail').value;
@@ -705,7 +712,7 @@
                 let referredBy = null;
                 if (referralCode) {
                     const referrer = await getUserByReferralCode(referralCode);
-                    if (referrer) referredBy = referrer.id;
+                    if (referrer) referredBy = referrer.userId;
                     sessionStorage.removeItem('pendingReferral');
                 }
                 
@@ -731,6 +738,13 @@
                 
                 await db.collection('users').doc(cred.user.uid).set(userData);
                 
+                // Create public referralInfo document for this user
+                await db.collection('referralInfo').doc(userData.referralCode).set({
+                    userId: cred.user.uid,
+                    displayName: name,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
                 if (referredBy) {
                     await db.collection('referrals').add({
                         referrerId: referredBy,
@@ -749,6 +763,7 @@
             }
         }
         
+        // ========== LOGIN (Email) ==========
         async function handleLogin() {
             const email = document.getElementById('loginEmail').value;
             const pwd = document.getElementById('loginPassword').value;
@@ -763,6 +778,7 @@
             }
         }
         
+        // ========== GOOGLE LOGIN – UPDATED ==========
         async function handleGoogleLogin() {
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
@@ -775,7 +791,7 @@
                     const referralCode = sessionStorage.getItem('pendingReferral');
                     if (referralCode) {
                         const referrer = await getUserByReferralCode(referralCode);
-                        if (referrer) referredBy = referrer.id;
+                        if (referrer) referredBy = referrer.userId;
                         sessionStorage.removeItem('pendingReferral');
                     }
                     const data = {
@@ -798,6 +814,14 @@
                     };
                     if (referredBy) data.referredBy = referredBy;
                     await userRef.set(data);
+                    
+                    // Create public referralInfo document for this user
+                    await db.collection('referralInfo').doc(data.referralCode).set({
+                        userId: user.uid,
+                        displayName: user.displayName || 'User',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
                     if (referredBy) {
                         await db.collection('referrals').add({
                             referrerId: referredBy,
@@ -814,6 +838,7 @@
             }
         }
         
+        // Email verification check
         async function checkVerification() {
             if (!auth.currentUser) return;
             await auth.currentUser.reload();
@@ -832,6 +857,7 @@
             }
         }
         
+        // ========== AUTH STATE HANDLER – IMPROVED ==========
         auth.onAuthStateChanged(async (user) => {
             if (!user) return;
             const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
@@ -841,7 +867,10 @@
             }
             try {
                 const udoc = await db.collection('users').doc(user.uid).get();
-                if (!udoc.exists) return;
+                if (!udoc.exists) {
+                    showAlert('Account data not found. Please contact support.', 'error');
+                    return;
+                }
                 const data = udoc.data();
                 if (data.active === false) {
                     await auth.signOut();
@@ -849,8 +878,9 @@
                     return;
                 }
                 window.location.href = data.role === 'admin' ? 'admin-dashboard.html' : 'user-dashboard.html';
-            } catch (e) {
-                console.error(e);
+            } catch (error) {
+                console.error('Auth state error:', error);
+                showAlert('Failed to load account data. Please try again later.', 'error');
             }
         });
     </script>
