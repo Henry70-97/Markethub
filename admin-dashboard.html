@@ -1055,22 +1055,22 @@
                         const typeBadge = t.type === 'auto' ? '<span class="badge info">auto</span>' : '<span class="badge primary">manual</span>';
                         html += `
                                .
-                                   <td>${t.order || 0}</td>
-                                   <td>${t.message}</td>
-                                   <td>${typeBadge}</td>
-                                   <td><span class="badge ${statusClass}">${statusText}</span></td>
-                                   <td>
-                                    <button class="btn btn-sm btn-primary" onclick="editTicker('${doc.id}', '${t.message}', ${t.order}, ${t.active})">Edit</button>
-                                    <button class="btn btn-sm btn-warning" onclick="toggleTickerStatus('${doc.id}', ${!t.active})">${t.active ? 'Deactivate' : 'Activate'}</button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteTicker('${doc.id}')">Delete</button>
-                                    <button class="btn btn-sm btn-secondary" onclick="moveTicker('${doc.id}', 'up')"><i class="fas fa-arrow-up"></i></button>
-                                    <button class="btn btn-sm btn-secondary" onclick="moveTicker('${doc.id}', 'down')"><i class="fas fa-arrow-down"></i></button>
-                                   </td>
-                                </tr>
+                                    <td>${t.order || 0}</td>
+                                    <td>${t.message}</td>
+                                    <td>${typeBadge}</td>
+                                    <td><span class="badge ${statusClass}">${statusText}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="editTicker('${doc.id}', '${t.message}', ${t.order}, ${t.active})">Edit</button>
+                                        <button class="btn btn-sm btn-warning" onclick="toggleTickerStatus('${doc.id}', ${!t.active})">${t.active ? 'Deactivate' : 'Activate'}</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteTicker('${doc.id}')">Delete</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="moveTicker('${doc.id}', 'up')"><i class="fas fa-arrow-up"></i></button>
+                                        <button class="btn btn-sm btn-secondary" onclick="moveTicker('${doc.id}', 'down')"><i class="fas fa-arrow-down"></i></button>
+                                    </td>
+                                  
                         `;
                     });
                 }
-                html += '   </tbody>   </table>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
                 console.error('Error loading tickers:', error);
@@ -1240,16 +1240,16 @@
                     
                     html += ` 
                         <tr class="user-row" data-email="${user.email.toLowerCase()}" data-name="${(user.displayName || '').toLowerCase()}"> 
-                            <td>${user.email}</td> 
-                            <td>${user.displayName}</td> 
-                            <td>$${user.wallet || 0}</td> 
-                            <td><span class="badge primary">${user.totalReferrals || 0}</span></td> 
-                            <td>$${user.referralEarnings || 0}</td> 
-                            <td><span class="badge ${membershipClass}">${(user.membershipType || 'basic').toUpperCase()}</span></td> 
-                            <td><span class="badge ${verified ? 'success' : 'warning'}">${verified ? 'Verified' : 'Unverified'}</span></td> 
-                            <td><span class="badge ${frozen ? 'danger' : 'success'}">${frozen ? 'Frozen' : 'Active'}</span></td> 
-                            <td>${user.role}</td> 
-                            <td><span class="badge ${active ? 'success' : 'danger'}">${active ? 'Active' : 'Inactive'}</span></td> 
+                            <td>${user.email}</td>
+                            <td>${user.displayName}</td>
+                            <td>$${user.wallet || 0}</td>
+                            <td><span class="badge primary">${user.totalReferrals || 0}</span></td>
+                            <td>$${user.referralEarnings || 0}</td>
+                            <td><span class="badge ${membershipClass}">${(user.membershipType || 'basic').toUpperCase()}</span></td>
+                            <td><span class="badge ${verified ? 'success' : 'warning'}">${verified ? 'Verified' : 'Unverified'}</span></td>
+                            <td><span class="badge ${frozen ? 'danger' : 'success'}">${frozen ? 'Frozen' : 'Active'}</span></td>
+                            <td>${user.role}</td>
+                            <td><span class="badge ${active ? 'success' : 'danger'}">${active ? 'Active' : 'Inactive'}</span></td>
                             <td>${suspendedStatus}</td>
                             <td>${newbieQualified}</td>
                             <td class="action-buttons"> 
@@ -1271,7 +1271,7 @@
                     `; 
                 }); 
                  
-                html += '</tbody></table>'; 
+                html += '</tbody> </div>'; 
                 document.getElementById('content').innerHTML = html; 
             } catch (error) {
                 console.error('Error loading users:', error);
@@ -1951,34 +1951,34 @@
                     const acceptCount = task.acceptedCount || 0;
                     
                     html += ` 
-                          <tr> 
-                              <td>${task.title}</td> 
-                              <td><span class="client-badge">${task.clientName || 'NextGen'}</span></td> 
-                              <td>$${task.reward}</td> 
-                            <td class="deadline-cell"> 
+                           <tr> 
+                              <td>${task.title}</td>
+                              <td><span class="client-badge">${task.clientName || 'NextGen'}</span></td>
+                              <td>$${task.reward}</td>
+                              <td class="deadline-cell"> 
                                 <span class="deadline-badge">${deadlineDisplay}</span> 
                                 ${deadlineStatus ? `<br><small class="badge ${deadlineStatus.class}">${deadlineStatus.text}</small>` : ''} 
-                              </td> 
-                              <td>${task.category}</td> 
-                              <td>${subcategoryDisplay}</td> 
+                              </td>
+                              <td>${task.category}</td>
+                              <td>${subcategoryDisplay}</td>
                               <td>${audioDisplay}</td>
                               <td>${annotationDisplay}</td>
-                              <td>${task.collaborable ? '✅' : '❌'}</td> 
-                              <td><span class="badge info">${assignedDisplay}</span></td> 
-                              <td><span class="badge primary">${subCount}</span></td> 
-                              <td><span class="badge warning">${acceptCount}</span></td> 
-                              <td><span class="badge ${task.active ? 'success' : 'danger'}">${task.active ? 'Active' : 'Inactive'}</span></td> 
-                            <td class="action-buttons"> 
+                              <td>${task.collaborable ? '✅' : '❌'}</td>
+                              <td><span class="badge info">${assignedDisplay}</span></td>
+                              <td><span class="badge primary">${subCount}</span></td>
+                              <td><span class="badge warning">${acceptCount}</span></td>
+                              <td><span class="badge ${task.active ? 'success' : 'danger'}">${task.active ? 'Active' : 'Inactive'}</span></td>
+                              <td class="action-buttons"> 
                                 <button class="btn btn-primary edit-task-btn" data-task-id="${task.id}">Edit</button> 
                                 <button class="btn btn-info view-requirements-btn" data-task-id="${task.id}">View Details</button> 
                                 <button class="btn btn-warning toggle-task-btn" data-task-id="${task.id}" data-new-status="${!task.active}">${task.active ? 'Deactivate' : 'Activate'}</button> 
                                 <button class="btn btn-secondary" onclick="showTaskSubmissions('${task.id}')">View Acceptees</button>
                               </td> 
-                          </tr> 
+                           </tr> 
                     `; 
                 } 
                  
-                html += '   </tbody>   </table>'; 
+                html += '   </tbody>   '; 
                 document.getElementById('content').innerHTML = html; 
             } catch (error) {
                 console.error('Error loading tasks:', error);
@@ -2883,17 +2883,17 @@
                         const inviterName = inviterDoc.exists ? inviterDoc.data().displayName || inviterDoc.data().email : invite.invitedByName || 'Unknown';
                         html += `
                                .
-                                    Was${taskTitle}Was
-                                    Was${userEmail}Was
-                                    Was${inviterName}Was
-                                    Was
+                                     Was${taskTitle}Was
+                                     Was${userEmail}Was
+                                     Was${inviterName}Was
+                                     Was
                                     <button class="btn btn-sm btn-success" onclick="approveTeamMember('${invite.taskId}', '${invite.userId}', '${doc.id}')">Approve</button>
                                     <button class="btn btn-sm btn-danger" onclick="rejectTeamMember('${invite.taskId}', '${invite.userId}', '${doc.id}')">Reject</button>
-                                    Was
+                                     Was
                                  .
                         `;
                     }
-                    html += '</tbody>  </div>';
+                    html += '</tbody>   ';
                 }
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
@@ -6374,7 +6374,7 @@
                                  .
                         `;
                     }
-                    html += '</tbody>   </div>';
+                    html += '</tbody>   ';
                 }
                 trainingContent.innerHTML = html;
             } catch (error) {
@@ -6737,7 +6737,7 @@
                                  .
                         `;
                     }
-                    html += '</tbody>   </div>';
+                    html += '</tbody>   ';
                 }
                 container.innerHTML = html;
             } catch (error) {
@@ -6850,9 +6850,9 @@
                     snapshot.forEach(doc => {
                         const log = doc.data();
                         const time = log.timestamp ? formatDate(log.timestamp) : 'N/A';
-                        html += `   <td>${log.userName || 'N/A'}</td><td>${log.userEmail || 'N/A'}</td><td>${time}</td><td>${log.ip || 'N/A'}</td> `;
+                        html += `   Was${log.userName || 'N/A'}Was${log.userEmail || 'N/A'}Was${time}Was${log.ip || 'N/A'}Was `;
                     });
-                    html += '</tbody>   </div>';
+                    html += '</tbody>   ';
                 }
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
@@ -6879,9 +6879,9 @@
                         const date = t.createdAt ? formatDate(t.createdAt) : 'N/A';
                         const amountClass = t.amount >= 0 ? 'success' : 'danger';
                         const amountStr = t.amount >= 0 ? `+$${t.amount.toFixed(2)}` : `-$${Math.abs(t.amount).toFixed(2)}`;
-                        html += `   <td>${date}</td><td>${t.userEmail || 'Unknown'}</td><td><span class="badge primary">${t.type.replace('_', ' ')}</span></td><td>${t.description}</td><td><span class="badge ${amountClass}">${amountStr}</span></td> `;
+                        html += `   Was${date}Was${t.userEmail || 'Unknown'}Was<span class="badge primary">${t.type.replace('_', ' ')}</span>Was${t.description}Was<span class="badge ${amountClass}">${amountStr}</span>Was `;
                     });
-                    html += '</tbody>   </div>';
+                    html += '</tbody>   ';
                 }
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
@@ -6911,19 +6911,19 @@
                         const hasResponse = p.response ? 'Yes' : 'No';
                         html += `
                                .
-                                    <td>${p.userEmail || p.userName || p.userId}</td>
-                                    <td>${p.message.substring(0,50)}...</td>
-                                    <td>${date}</td>
-                                    <td><span class="badge ${p.response ? 'success' : 'warning'}">${hasResponse}</span></td>
-                                    <td>
+                                     Was${p.userEmail || p.userName || p.userId}Was
+                                     Was${p.message.substring(0,50)}...Was
+                                     Was${date}Was
+                                     Was<span class="badge ${p.response ? 'success' : 'warning'}">${hasResponse}</span>Was
+                                     Was
                                     <button class="btn btn-sm btn-primary" onclick="viewPetition('${doc.id}', '${p.userId}', '${p.message.replace(/'/g, "\\'")}', '${p.response || ''}')">View</button>
                                     ${!p.response ? `<button class="btn btn-sm btn-warning" onclick="replyToPetition('${doc.id}', '${p.userId}', '${p.message.replace(/'/g, "\\'")}')">Reply</button>` : ''}
-                                    </td>
+                                     Was
                                  .
                         `;
                     });
                 }
-                html += '   </tbody>   </div>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
                 console.error('Error loading petitions:', error);
@@ -7006,19 +7006,19 @@
                             : '<span class="badge info">Auto</span>';
                         html += `
                                .
-                                    <td>#${entry.rank}</td>
-                                    <td>${entry.userName}</td>
-                                    <td>${entry.points}</td>
-                                    <td>${typeBadge}</td>
-                                    <td>
+                                     Was#${entry.rank}Was
+                                     Was${entry.userName}Was
+                                     Was${entry.points}Was
+                                     Was${typeBadge}Was
+                                     Was
                                     <button class="btn btn-sm btn-primary" onclick="editLeaderboardEntry('${doc.id}', ${entry.rank}, '${entry.userName}', ${entry.points})">Edit</button>
                                     <button class="btn btn-sm btn-danger" onclick="deleteLeaderboardEntry('${doc.id}')">Delete</button>
-                                    </td>
+                                     Was
                                  .
                         `;
                     });
                 }
-                html += '   </tbody>   </div>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
                 console.error('Error loading leaderboard:', error);
@@ -7475,18 +7475,18 @@
                         const faq = doc.data();
                         html += `
                                .
-                                    <td>${faq.order || 0}</td>
-                                    <td>${faq.question}</td>
-                                    <td>${faq.answer.substring(0,50)}...</td>
-                                    <td>
+                                     Was${faq.order || 0}Was
+                                     Was${faq.question}Was
+                                     Was${faq.answer.substring(0,50)}...Was
+                                     Was
                                     <button class="btn btn-sm btn-primary" onclick="editFaq('${doc.id}', ${faq.order || 0}, '${faq.question}', '${faq.answer}')">Edit</button>
                                     <button class="btn btn-sm btn-danger" onclick="deleteFaq('${doc.id}')">Delete</button>
-                                    </td>
+                                     Was
                                  .
                         `;
                     });
                 }
-                html += '   </tbody>   </div>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
                 console.error('Error loading FAQs:', error);
@@ -7604,17 +7604,17 @@
                         const date = fb.createdAt ? formatDate(fb.createdAt) : 'N/A';
                         html += `
                                .
-                                    <td>${fb.clientName || 'Anonymous'}</td>
-                                    <td>${fb.message.substring(0,50)}...</td>
-                                    <td>${date}</td>
-                                    <td>
+                                     Was${fb.clientName || 'Anonymous'}Was
+                                     Was${fb.message.substring(0,50)}...Was
+                                     Was${date}Was
+                                     Was
                                     <button class="btn btn-sm btn-danger" onclick="deleteFeedback('${doc.id}')">Delete</button>
-                                    </td>
+                                     Was
                                  .
                         `;
                     });
                 }
-                html += '   </tbody>   </div>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
                 console.error('Error loading feedback:', error);
@@ -8075,23 +8075,23 @@
                         const membershipClass = u.membershipType === 'elite' ? 'warning' : u.membershipType === 'premium' ? 'primary' : 'info';
                         html += `
                               <tr data-user-id="${u.id}">
-                                    <td><input type="checkbox" class="inactive-user-checkbox" value="${u.id}"></td>
-                                    <td>${u.email}</td>
-                                    <td>${u.displayName || ''}</td>
-                                    <td>$${u.wallet || 0}</td>
-                                    <td><span class="badge ${membershipClass}">${(u.membershipType || 'basic').toUpperCase()}</span></td>
-                                    <td>${lastLoginStr}</td>
-                                    <td>${lastSubStr}</td>
-                                    <td>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}', '${u.email}')">Delete</button>
-                                    <button class="btn btn-sm btn-warning" onclick="toggleSuspendUser('${u.id}', ${u.suspended || false})">${u.suspended ? 'Unsuspend' : 'Suspend'}</button>
-                                    <button class="btn btn-sm btn-secondary" onclick="toggleFrozen('${u.id}', ${u.frozen || false})">${u.frozen ? 'Unfreeze' : 'Freeze'}</button>
-                                    </td>
-                                 .
+                                     <td><input type="checkbox" class="inactive-user-checkbox" value="${u.id}"></td>
+                                     <td>${u.email}</td>
+                                     <td>${u.displayName || ''}</td>
+                                     <td>$${u.wallet || 0}</td>
+                                     <td><span class="badge ${membershipClass}">${(u.membershipType || 'basic').toUpperCase()}</span></td>
+                                     <td>${lastLoginStr}</td>
+                                     <td>${lastSubStr}</td>
+                                     <td>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}', '${u.email}')">Delete</button>
+                                        <button class="btn btn-sm btn-warning" onclick="toggleSuspendUser('${u.id}', ${u.suspended || false})">${u.suspended ? 'Unsuspend' : 'Suspend'}</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="toggleFrozen('${u.id}', ${u.frozen || false})">${u.frozen ? 'Unfreeze' : 'Freeze'}</button>
+                                     </td>
+                                  
                         `;
                     });
                 }
-                html += '   </tbody>   </div>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
 
                 window.toggleSelectAllInactive = function() {
@@ -8842,7 +8842,7 @@
                         `;
                     });
                 }
-                html += '   </tbody>   </div>';
+                html += '   </tbody>   ';
                 document.getElementById('content').innerHTML = html;
             } catch (error) {
                 console.error('Error loading announcements:', error);
@@ -8941,7 +8941,7 @@
             } catch (e) { showAlert('Error moving: ' + e.message, 'error'); }
         };
 
-        // ==================== INVESTOR MANAGEMENT (ENHANCED) ====================
+        // ==================== INVESTOR MANAGEMENT (ENHANCED WITH IMPROVED TABLES) ====================
         let currentInvestorSubTab = 'settings'; // 'settings', 'transactions', or 'accounts'
 
         async function loadInvestorManager() {
@@ -9082,7 +9082,7 @@
                 if (depositsSnap.empty) {
                     html += '<p>No deposit requests.</p>';
                 } else {
-                    html += '<table class="data-table"> <thead> <th>User</th><th>Amount</th><th>Method</th><th>Code</th><th>Date</th><th>Status</th><th>Actions</th> </thead><tbody>';
+                    html += '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Code</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
                     for (const doc of depositsSnap.docs) {
                         const d = doc.data();
                         const statusClass = d.status === 'pending' ? 'warning' : (d.status === 'approved' ? 'success' : 'danger');
@@ -9093,32 +9093,32 @@
                             if (userDoc.exists) userName = userDoc.data().displayName || userDoc.data().email;
                         } catch(e) {}
                         html += `
-                               .
-                                     Was${userName}Was
-                                     Was$${d.amount.toFixed(2)}Was
-                                     Was${d.paymentMethod || 'N/A'}Was
-                                     Was${d.transactionCode || 'N/A'}Was
-                                     Was${d.createdAt ? formatDate(d.createdAt) : 'N/A'}Was
-                                     Was<span class="badge ${statusClass}">${d.status}</span>Was
-                                     Was
+                              <tr>
+                                  <td>${escapeHtml(userName)}</td>
+                                  <td>$${d.amount.toFixed(2)}</td>
+                                  <td>${escapeHtml(d.paymentMethod || 'N/A')}</td>
+                                  <td>${escapeHtml(d.transactionCode || 'N/A')}</td>
+                                  <td>${d.createdAt ? formatDate(d.createdAt) : 'N/A'}</td>
+                                  <td><span class="badge ${statusClass}">${d.status || 'pending'}</span></td>
+                                  <td>
                                     ${d.status === 'pending' ? `
                                         <button class="btn btn-sm btn-success approve-investment-deposit" data-id="${doc.id}" data-user-id="${d.userId}" data-amount="${d.amount}">Approve</button>
                                         <button class="btn btn-sm btn-danger reject-investment-deposit" data-id="${doc.id}" data-user-id="${d.userId}" data-amount="${d.amount}">Reject</button>
                                     ` : `
                                         <button class="btn btn-sm btn-warning revert-investment-deposit" data-id="${doc.id}" data-user-id="${d.userId}" data-amount="${d.amount}" data-status="${d.status}">Revert</button>
                                     `}
-                                     Was
-                                 .
+                                  </td>
+                              </tr>
                         `;
                     }
-                    html += '</tbody>   </div>';
+                    html += '</tbody></table></div>';
                 }
 
                 html += '<h4 style="margin-top:2rem;">Withdrawals</h4>';
                 if (withdrawalsSnap.empty) {
                     html += '<p>No withdrawal requests.</p>';
                 } else {
-                    html += '<table class="data-table"> <thead> <th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Date</th><th>Status</th><th>Actions</th> </thead><tbody>';
+                    html += '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
                     for (const doc of withdrawalsSnap.docs) {
                         const w = doc.data();
                         const statusClass = w.status === 'pending' ? 'warning' : (w.status === 'paid' ? 'success' : 'danger');
@@ -9134,25 +9134,25 @@
                             if (userDoc.exists) userName = userDoc.data().displayName || userDoc.data().email;
                         } catch(e) {}
                         html += `
-                               .
-                                     Was${userName}Was
-                                     Was$${w.amount.toFixed(2)}Was
-                                     Was${w.method}Was
-                                     Was${details}Was
-                                     Was${w.requestedAt ? formatDate(w.requestedAt) : 'N/A'}Was
-                                     Was<span class="badge ${statusClass}">${w.status}</span>Was
-                                     Was
+                              <tr>
+                                  <td>${escapeHtml(userName)}</td>
+                                  <td>$${w.amount.toFixed(2)}</td>
+                                  <td>${escapeHtml(w.method)}</td>
+                                  <td>${escapeHtml(details)}</td>
+                                  <td>${w.requestedAt ? formatDate(w.requestedAt) : 'N/A'}</td>
+                                  <td><span class="badge ${statusClass}">${w.status || 'pending'}</span></td>
+                                  <td>
                                     ${w.status === 'pending' ? `
                                         <button class="btn btn-sm btn-success approve-investment-withdrawal" data-id="${doc.id}" data-user-id="${w.userId}" data-amount="${w.amount}">Approve</button>
                                         <button class="btn btn-sm btn-danger reject-investment-withdrawal" data-id="${doc.id}" data-user-id="${w.userId}" data-amount="${w.amount}">Reject</button>
                                     ` : `
                                         <button class="btn btn-sm btn-warning revert-investment-withdrawal" data-id="${doc.id}" data-user-id="${w.userId}" data-amount="${w.amount}" data-status="${w.status}">Revert</button>
                                     `}
-                                     Was
-                                 .
+                                  </td>
+                              </tr>
                         `;
                     }
-                    html += '</tbody>   </div>';
+                    html += '</tbody></table></div>';
                 }
 
                 container.innerHTML = html;
@@ -9162,7 +9162,7 @@
             }
         }
 
-        // New: Load active investor accounts (FIXED: safe numeric formatting)
+        // New: Load active investor accounts (with improved layout)
         async function loadInvestorAccounts() {
             const container = document.getElementById('investorContent');
             if (!container) return;
@@ -9173,7 +9173,7 @@
                 if (accountsSnap.empty) {
                     html += '<p>No investor accounts yet.</p>';
                 } else {
-                    html += '<table class="data-table"> <thead> <th>User</th><th>Balance</th><th>Total Invested</th><th>Total Earned</th><th>Maturity (based on last deposit)</th><th>Actions</th> </thead><tbody>';
+                    html += '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>User</th><th>Balance</th><th>Total Invested</th><th>Total Earned</th><th>Maturity (based on last deposit)</th><th>Actions</th></tr></thead><tbody>';
                     for (const doc of accountsSnap.docs) {
                         const acc = doc.data();
                         let userName = acc.userId;
@@ -9202,19 +9202,19 @@
                         const totalEarnings = (acc.totalEarnings || 0).toFixed(2);
                         
                         html += `
-                               .
-                                     Was${escapeHtml(userName)}Was
-                                     Was$${balance}Was
-                                     Was$${totalInvested}Was
-                                     Was$${totalEarnings}Was
-                                     Was${maturity}Was
-                                     Was
-                                        <button class="btn btn-sm btn-danger revert-investment-account" data-id="${doc.id}" data-user-id="${acc.userId}" data-action="reset">Reset Account</button>
-                                     Was
-                                 .
+                              <tr>
+                                  <td>${escapeHtml(userName)}</td>
+                                  <td>$${balance}</td>
+                                  <td>$${totalInvested}</td>
+                                  <td>$${totalEarnings}</td>
+                                  <td>${maturity}</td>
+                                  <td>
+                                      <button class="btn btn-sm btn-danger revert-investment-account" data-id="${doc.id}" data-user-id="${acc.userId}" data-action="reset">Reset Account</button>
+                                  </td>
+                              </tr>
                         `;
                     }
-                    html += '</tbody>   </div>';
+                    html += '</tbody></table></div>';
                 }
                 container.innerHTML = html;
             } catch (error) {
