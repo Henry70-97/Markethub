@@ -194,6 +194,15 @@
         .modal-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
         .modal-buttons .btn { width: auto; min-width: 130px; padding: 0.75rem 1rem; }
         
+        /* Verification Panel (after clicking Verify Now) */
+        .verify-panel {
+            text-align: center;
+            padding: 0.5rem 0;
+        }
+        .verify-panel i { font-size: 3rem; color: #b4945a; margin-bottom: 1rem; }
+        .verify-panel h3 { font-weight: 600; margin-bottom: 0.75rem; color: #3d3425; }
+        .verify-panel p { color: #6b5e48; margin-bottom: 1.5rem; }
+        
         .alert-dialog {
             position: fixed;
             top: 50%; left: 50%;
@@ -289,7 +298,15 @@
             <div class="info-text" style="text-align:center; margin-top:1rem; font-size:0.8rem;"><i class="fas fa-envelope"></i> Verification email will be sent, but you may verify later</div>
         </div>
         
-        <div id="verifyMessage" class="form hidden"></div>
+        <!-- Verification Panel (shown when user clicks Verify Now) -->
+        <div id="verificationPanel" class="form hidden verify-panel">
+            <i class="fas fa-envelope-open-text"></i>
+            <h3>Verify your email</h3>
+            <p>We've sent a verification link to <strong id="verifyEmailSpan"></strong></p>
+            <button class="btn btn-primary" id="checkVerificationBtn" style="margin-bottom: 0.8rem;">I've verified — continue</button>
+            <div class="link"><a id="resendVerificationLink">Resend verification email</a></div>
+            <div class="link" style="margin-top: 1rem;"><a id="backToLoginFromVerify">Back to login</a></div>
+        </div>
     </div>
     
     <!-- Modal for "Verify Later" decision -->
@@ -346,7 +363,7 @@
             document.getElementById('globalOverlay').classList.remove('show');
         }
         
-        // Referral logic (no Firestore reads for stats)
+        // Referral logic
         function generateReferralCode(uid) { return uid.substring(0,8).toUpperCase(); }
         function getReferralCodeFromUrl() {
             const params = new URLSearchParams(window.location.search);
@@ -377,6 +394,7 @@
             else document.getElementById('tabRegBtn').classList.add('active');
             document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
             document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+            document.getElementById('verificationPanel').classList.add('hidden');
             hideResetPasswordModal();
         }
         
@@ -397,10 +415,65 @@
             catch(e) { showAlert(e.message); }
         }
         
-        // Flag to prevent auto-redirect while modal is active
-        let verificationModalActive = false;
+        // Global flag to block auto-redirect while modal or verification panel is active
+        let blockAutoRedirect = false;
+        let currentUserObj = null; // store user after registration
         
-        // Registration: create user, store in Firestore, then show modal (or clean up on error)
+        // Show verification panel (after clicking Verify Now)
+        function showVerificationPanel(user) {
+            blockAutoRedirect = true;
+            sessionStorage.setItem('skipRedirectForVerification', 'true');
+            // Hide login/register forms, show verification panel
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            const verifyPanel = document.getElementById('verificationPanel');
+            verifyPanel.classList.remove('hidden');
+            document.getElementById('verifyEmailSpan').innerText = user.email;
+            
+            // Attach event handlers for verification panel
+            const checkBtn = document.getElementById('checkVerificationBtn');
+            const resendLink = document.getElementById('resendVerificationLink');
+            const backLink = document.getElementById('backToLoginFromVerify');
+            
+            const checkHandler = async () => {
+                await user.reload();
+                if (user.emailVerified) {
+                    await db.collection('users').doc(user.uid).update({ verified: true });
+                    blockAutoRedirect = false;
+                    sessionStorage.removeItem('skipRedirectForVerification');
+                    window.location.href = 'user-dashboard.html';
+                } else {
+                    showAlert('Email not verified yet. Please check your inbox (and spam folder).', 'error');
+                }
+            };
+            const resendHandler = async () => {
+                try {
+                    await user.sendEmailVerification();
+                    showAlert('Verification email resent successfully!', 'success');
+                } catch(e) { showAlert(e.message, 'error'); }
+            };
+            const backHandler = () => {
+                // Clear block and sign out to allow login
+                blockAutoRedirect = false;
+                sessionStorage.removeItem('skipRedirectForVerification');
+                auth.signOut().then(() => {
+                    window.location.reload();
+                });
+            };
+            
+            // Replace listeners to avoid duplicates
+            checkBtn.removeEventListener('click', checkBtn._listener);
+            resendLink.removeEventListener('click', resendLink._listener);
+            backLink.removeEventListener('click', backLink._listener);
+            checkBtn.addEventListener('click', checkHandler);
+            resendLink.addEventListener('click', resendHandler);
+            backLink.addEventListener('click', backHandler);
+            checkBtn._listener = checkHandler;
+            resendLink._listener = resendHandler;
+            backLink._listener = backHandler;
+        }
+        
+        // Registration: create user, store in Firestore, then show modal
         async function initiateRegistration() {
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
@@ -412,7 +485,6 @@
             try {
                 const userCred = await auth.createUserWithEmailAndPassword(email, pwd);
                 const user = userCred.user;
-                // Send verification email
                 await user.sendEmailVerification();
                 
                 // Prepare referral data
@@ -433,10 +505,8 @@
                 };
                 if(referredBy) userData.referredBy = referredBy;
                 
-                // Write to Firestore
                 await db.collection('users').doc(user.uid).set(userData);
                 
-                // If referral exists, create referral doc
                 if(referredBy) {
                     await db.collection('referrals').add({
                         referrerId: referredBy, referredId: user.uid, referredEmail: email,
@@ -444,40 +514,29 @@
                     }).catch(e => console.warn("Referral doc error", e));
                 }
                 
-                // Mark modal active to block onAuthStateChanged redirect
-                verificationModalActive = true;
+                // Store user for later use in modal/verification
+                currentUserObj = user;
+                blockAutoRedirect = true;
                 sessionStorage.setItem('skipRedirectForVerification', 'true');
                 
                 // Show the "Verify later" modal
                 const modalOverlay = document.getElementById('verifyLaterModalOverlay');
                 modalOverlay.classList.add('active');
                 
-                // Attach handlers for modal buttons
                 const proceedBtn = document.getElementById('proceedToDashboardBtn');
                 const verifyNowBtn = document.getElementById('verifyNowBtn');
                 
                 const proceedHandler = () => {
                     modalOverlay.classList.remove('active');
-                    verificationModalActive = false;
+                    blockAutoRedirect = false;
                     sessionStorage.removeItem('skipRedirectForVerification');
                     window.location.href = 'user-dashboard.html';
                 };
-                const verifyNowHandler = async () => {
+                const verifyNowHandler = () => {
                     modalOverlay.classList.remove('active');
-                    verificationModalActive = false;
-                    sessionStorage.removeItem('skipRedirectForVerification');
-                    await user.reload();
-                    if(user.emailVerified) {
-                        await db.collection('users').doc(user.uid).update({ verified: true });
-                        window.location.href = 'user-dashboard.html';
-                    } else {
-                        showAlert("Verification email already sent. Please check your inbox and click the link, then log in.", "success");
-                        await auth.signOut();
-                        window.location.reload();
-                    }
+                    showVerificationPanel(currentUserObj);
                 };
                 
-                // Remove old listeners to avoid duplicates
                 proceedBtn.removeEventListener('click', proceedBtn._listener);
                 verifyNowBtn.removeEventListener('click', verifyNowBtn._listener);
                 proceedBtn.addEventListener('click', proceedHandler);
@@ -487,13 +546,10 @@
                 
             } catch (error) {
                 console.error("Registration error:", error);
-                // If Firestore write fails (permission denied), delete the Auth user to avoid orphan
                 if (error.code === 'permission-denied' || error.message.includes('permission')) {
                     const currentUser = auth.currentUser;
                     if (currentUser) {
-                        try {
-                            await currentUser.delete();
-                        } catch (deleteErr) { console.warn("Could not delete orphaned auth user", deleteErr); }
+                        try { await currentUser.delete(); } catch(e) {}
                     }
                     showAlert("Permission error: Unable to create account. Please contact support.", "error");
                 } else if (error.code === 'auth/email-already-in-use') {
@@ -540,15 +596,14 @@
                     await userRef.set(data);
                     if(referredBy) await db.collection('referrals').add({ referrerId: referredBy, referredId: user.uid, referredEmail: user.email, referredName: user.displayName, status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                 }
-                // Google sign-in always verified, redirect handled by onAuthStateChanged
+                // Google always verified, redirect will happen in onAuthStateChanged
             } catch(e) { showAlert(e.message); }
         }
         
-        // Auth state listener: redirect only when no verification modal is active
+        // Auth state listener: redirect only when not blocked and no modal/verification active
         auth.onAuthStateChanged(async (user) => {
             if (!user) return;
-            // If we are showing the "verify later" modal, do NOT redirect
-            if (verificationModalActive || sessionStorage.getItem('skipRedirectForVerification') === 'true') return;
+            if (blockAutoRedirect || sessionStorage.getItem('skipRedirectForVerification') === 'true') return;
             
             const isGoogle = user.providerData && user.providerData.some(p => p?.providerId === 'google.com');
             try {
