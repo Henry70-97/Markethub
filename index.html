@@ -4,17 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>NextGen HUB | Academic Hub</title>
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <!-- Font Awesome & Google Fonts -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        
-        /* Metallic intro overlay */
         .intro-overlay {
             position: fixed;
             top: 0;
@@ -49,7 +45,6 @@
             100% { opacity: 1; letter-spacing: normal; filter: blur(0); }
         }
         .intro-overlay.fade-out { opacity: 0; }
-        
         body {
             background: linear-gradient(145deg, #dbd0bd 0%, #b8aa92 100%);
             min-height: 100vh;
@@ -59,12 +54,11 @@
             padding: 1.5rem;
             position: relative;
         }
-        
         .auth-card {
             background: rgba(255, 251, 242, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 32px;
-            padding: 2rem 2rem 2rem 2rem;
+            padding: 2rem;
             width: 100%;
             max-width: 500px;
             box-shadow: 0 30px 60px -20px rgba(40,30,10,0.5), 0 0 0 1px rgba(210,180,140,0.25) inset, 0 0 0 1px rgba(255,245,220,0.7);
@@ -74,8 +68,6 @@
         .auth-card:hover { transform: translateY(-3px); }
         .logo { text-align: center; margin-bottom: 1.5rem; }
         .card-logo { max-width: 100%; max-height: 70px; object-fit: contain; filter: drop-shadow(0 2px 8px rgba(120,90,40,0.2)); }
-        
-        /* Welcome banner - static with earning ways */
         .welcome-banner {
             background: linear-gradient(115deg, #e9e0cf, #dfd2bc);
             border-radius: 28px;
@@ -89,7 +81,6 @@
         .welcome-banner strong { color: #9d7c42; }
         .earn-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
         .earn-tag { background: #fff6ea; padding: 0.2rem 0.8rem; border-radius: 40px; font-size: 0.75rem; font-weight: 600; color: #5c4a2e; border: 1px solid #e2cfaa; }
-        
         .tabs {
             display: flex;
             gap: 0.75rem;
@@ -113,7 +104,6 @@
         .tab.active { background: #ffffff; color: #413a2c; box-shadow: 0 6px 14px rgba(160,130,70,0.2); border: 1px solid #eedbba; }
         .form { display: block; }
         .form.hidden { display: none; }
-        
         .input-group { margin-bottom: 1.2rem; position: relative; }
         .input-group input, .input-group select {
             width: 100%;
@@ -151,7 +141,6 @@
         .btn-secondary { background: #e7ddcd; color: #4d3e2b; border: 1px solid #cfbc97; }
         .btn-secondary:hover { background: #f2e6d4; }
         .btn-google { background: #ffffff; color: #413a2e; border: 1.5px solid #dad0bc; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
-        
         .divider { text-align: center; margin: 1.5rem 0; position: relative; }
         .divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #cbb48b, transparent); }
         .divider span { background: rgba(255,251,242,0.95); padding: 0 1.2rem; position: relative; color: #7e6e51; font-weight: 500; font-size: 0.9rem; }
@@ -163,8 +152,6 @@
             border-radius: 60px; font-size: 0.9rem; color: #3a3326; display: flex; align-items: center; gap: 0.7rem;
         }
         .bonus-badge { background: #d8b87a; color: #2f2a1f; padding: 0.2rem 0.7rem; border-radius: 40px; font-size: 0.7rem; font-weight: 700; margin-left: 0.5rem; }
-        
-        /* Modal Styles (Verify Later) */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -193,8 +180,6 @@
         .verify-later-modal p { color: #6b5e48; margin: 0.8rem 0 1.8rem; line-height: 1.4; }
         .modal-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
         .modal-buttons .btn { width: auto; min-width: 130px; padding: 0.75rem 1rem; }
-        
-        /* Verification Panel (after clicking Verify Now) */
         .verify-panel {
             text-align: center;
             padding: 0.5rem 0;
@@ -202,7 +187,6 @@
         .verify-panel i { font-size: 3rem; color: #b4945a; margin-bottom: 1rem; }
         .verify-panel h3 { font-weight: 600; margin-bottom: 0.75rem; color: #3d3425; }
         .verify-panel p { color: #6b5e48; margin-bottom: 1.5rem; }
-        
         .alert-dialog {
             position: fixed;
             top: 50%; left: 50%;
@@ -246,13 +230,10 @@
     <div class="intro-overlay" id="introOverlay">
         <div class="intro-content"><img src="logo.jpg" alt="NextGen Hub Logo" class="intro-logo"></div>
     </div>
-
     <div class="auth-card">
         <div class="logo"><img src="logo.jpg" alt="NextGen Hub Logo" class="card-logo"></div>
-        
-        <!-- STATIC WELCOME BANNER with earning ways -->
         <div class="welcome-banner">
-            <p><i class="fas fa-hand-wave" style="margin-right: 8px;"></i> <strong>Welcome to NextGen Hub!</strong></p>
+            <p><i class="fas fa-hand-wave"></i> <strong>Welcome to NextGen Hub!</strong></p>
             <p>💰 <strong>Ways to earn:</strong></p>
             <div class="earn-list">
                 <span class="earn-tag"><i class="fas fa-pen-fancy"></i> Academic Writing</span>
@@ -264,15 +245,11 @@
                 <span class="earn-tag"><i class="fas fa-database"></i> Data Annotations</span>
             </div>
         </div>
-        
         <div class="tabs">
             <button class="tab active" id="tabLoginBtn" onclick="switchTab('login')">Log in</button>
             <button class="tab" id="tabRegBtn" onclick="switchTab('register')">Register</button>
         </div>
-        
         <div id="referrerMessageContainer"></div>
-        
-        <!-- Login Form -->
         <div id="loginForm" class="form">
             <div class="input-group"><input type="email" id="loginEmail" placeholder="Email address"></div>
             <div class="input-group">
@@ -284,8 +261,6 @@
             <div class="divider"><span>or continue with</span></div>
             <button class="btn btn-google" onclick="handleGoogleLogin()"><i class="fab fa-google"></i> Google</button>
         </div>
-        
-        <!-- Register Form -->
         <div id="registerForm" class="form hidden">
             <div class="input-group"><input type="text" id="regName" placeholder="Full name"></div>
             <div class="input-group"><input type="email" id="regEmail" placeholder="Email address"></div>
@@ -297,8 +272,6 @@
             <button class="btn btn-primary" onclick="initiateRegistration()">Create account</button>
             <div class="info-text" style="text-align:center; margin-top:1rem; font-size:0.8rem;"><i class="fas fa-envelope"></i> Verification email will be sent, but you may verify later</div>
         </div>
-        
-        <!-- Verification Panel (shown when user clicks Verify Now) -->
         <div id="verificationPanel" class="form hidden verify-panel">
             <i class="fas fa-envelope-open-text"></i>
             <h3>Verify your email</h3>
@@ -308,8 +281,6 @@
             <div class="link" style="margin-top: 1rem;"><a id="backToLoginFromVerify">Back to login</a></div>
         </div>
     </div>
-    
-    <!-- Modal for "Verify Later" decision -->
     <div class="modal-overlay" id="verifyLaterModalOverlay">
         <div class="verify-later-modal">
             <i class="fas fa-envelope-open-text"></i>
@@ -321,11 +292,8 @@
             </div>
         </div>
     </div>
-    
-    <!-- Global alert & reset modal -->
     <div class="global-overlay" id="globalOverlay" onclick="hideAlert()"></div>
     <div class="alert-dialog" id="alertDialog"><i class="fas" id="alertIcon"></i><h3 id="alertTitle"></h3><p id="alertMessage"></p><button class="btn btn-primary" onclick="hideAlert()">OK</button></div>
-    
     <div class="reset-modal" id="resetModal">
         <span class="close-modal" onclick="hideResetPasswordModal()">&times;</span>
         <h2>Reset Password</h2>
@@ -334,9 +302,7 @@
         <button class="btn btn-primary" onclick="handlePasswordReset()">Send Reset Link</button>
         <div class="link"><a onclick="hideResetPasswordModal()">Back to login</a></div>
     </div>
-    
     <script>
-        // ---------- FIREBASE ----------
         const firebaseConfig = {
             apiKey: "AIzaSyChk2JA68-I5s1D0S10r9WK71LgTNi4hRQ",
             authDomain: "nextgen-5fb6f.firebaseapp.com",
@@ -349,7 +315,9 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         
-        // Helper UI
+        let isRegisteringFlow = false;  // blocks auth redirect during registration
+        let pendingUser = null;
+        
         function showAlert(msg, type='error') {
             const d = document.getElementById('alertDialog');
             document.getElementById('globalOverlay').classList.add('show');
@@ -363,18 +331,13 @@
             document.getElementById('globalOverlay').classList.remove('show');
         }
         
-        // Referral logic
         function generateReferralCode(uid) { return uid.substring(0,8).toUpperCase(); }
-        function getReferralCodeFromUrl() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('ref');
-        }
+        function getReferralCodeFromUrl() { return new URLSearchParams(window.location.search).get('ref'); }
         async function getUserByReferralCode(code) {
             try {
                 const snap = await db.collection('users').where('referralCode', '==', code).limit(1).get();
-                if(!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
-                return null;
-            } catch(e) { console.warn("Referral lookup failed", e); return null; }
+                return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+            } catch(e) { return null; }
         }
         async function showReferrerMessageFromUrl() {
             const refCode = getReferralCodeFromUrl();
@@ -405,7 +368,6 @@
             else { field.type = 'password'; icon.classList.replace('fa-eye','fa-eye-slash'); }
         }
         
-        // Reset password modals
         function showResetPasswordModal() { document.getElementById('resetModal').classList.add('show'); document.getElementById('globalOverlay').classList.add('show'); }
         function hideResetPasswordModal() { document.getElementById('resetModal').classList.remove('show'); document.getElementById('globalOverlay').classList.remove('show'); }
         async function handlePasswordReset() {
@@ -415,22 +377,13 @@
             catch(e) { showAlert(e.message); }
         }
         
-        // Global flag to block auto-redirect while modal or verification panel is active
-        let blockAutoRedirect = false;
-        let currentUserObj = null; // store user after registration
-        
-        // Show verification panel (after clicking Verify Now)
         function showVerificationPanel(user) {
-            blockAutoRedirect = true;
-            sessionStorage.setItem('skipRedirectForVerification', 'true');
-            // Hide login/register forms, show verification panel
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('registerForm').classList.add('hidden');
             const verifyPanel = document.getElementById('verificationPanel');
             verifyPanel.classList.remove('hidden');
             document.getElementById('verifyEmailSpan').innerText = user.email;
             
-            // Attach event handlers for verification panel
             const checkBtn = document.getElementById('checkVerificationBtn');
             const resendLink = document.getElementById('resendVerificationLink');
             const backLink = document.getElementById('backToLoginFromVerify');
@@ -439,8 +392,6 @@
                 await user.reload();
                 if (user.emailVerified) {
                     await db.collection('users').doc(user.uid).update({ verified: true });
-                    blockAutoRedirect = false;
-                    sessionStorage.removeItem('skipRedirectForVerification');
                     window.location.href = 'user-dashboard.html';
                 } else {
                     showAlert('Email not verified yet. Please check your inbox (and spam folder).', 'error');
@@ -453,15 +404,9 @@
                 } catch(e) { showAlert(e.message, 'error'); }
             };
             const backHandler = () => {
-                // Clear block and sign out to allow login
-                blockAutoRedirect = false;
-                sessionStorage.removeItem('skipRedirectForVerification');
-                auth.signOut().then(() => {
-                    window.location.reload();
-                });
+                auth.signOut().then(() => window.location.reload());
             };
             
-            // Replace listeners to avoid duplicates
             checkBtn.removeEventListener('click', checkBtn._listener);
             resendLink.removeEventListener('click', resendLink._listener);
             backLink.removeEventListener('click', backLink._listener);
@@ -473,7 +418,6 @@
             backLink._listener = backHandler;
         }
         
-        // Registration: create user, store in Firestore, then show modal
         async function initiateRegistration() {
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
@@ -482,12 +426,13 @@
             if(!name || !email || !pwd || !phone) return showAlert('Please fill all fields');
             if(pwd.length < 6) return showAlert('Password must be at least 6 characters');
             
+            isRegisteringFlow = true;  // block auth redirect
+            
             try {
                 const userCred = await auth.createUserWithEmailAndPassword(email, pwd);
                 const user = userCred.user;
                 await user.sendEmailVerification();
                 
-                // Prepare referral data
                 const referralCodeFromStorage = sessionStorage.getItem('pendingReferral');
                 let referredBy = null;
                 if(referralCodeFromStorage) {
@@ -504,22 +449,15 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 if(referredBy) userData.referredBy = referredBy;
-                
                 await db.collection('users').doc(user.uid).set(userData);
-                
                 if(referredBy) {
                     await db.collection('referrals').add({
                         referrerId: referredBy, referredId: user.uid, referredEmail: email,
                         referredName: name, status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }).catch(e => console.warn("Referral doc error", e));
+                    }).catch(e => console.warn(e));
                 }
                 
-                // Store user for later use in modal/verification
-                currentUserObj = user;
-                blockAutoRedirect = true;
-                sessionStorage.setItem('skipRedirectForVerification', 'true');
-                
-                // Show the "Verify later" modal
+                pendingUser = user;
                 const modalOverlay = document.getElementById('verifyLaterModalOverlay');
                 modalOverlay.classList.add('active');
                 
@@ -528,13 +466,13 @@
                 
                 const proceedHandler = () => {
                     modalOverlay.classList.remove('active');
-                    blockAutoRedirect = false;
-                    sessionStorage.removeItem('skipRedirectForVerification');
+                    isRegisteringFlow = false;
                     window.location.href = 'user-dashboard.html';
                 };
                 const verifyNowHandler = () => {
                     modalOverlay.classList.remove('active');
-                    showVerificationPanel(currentUserObj);
+                    showVerificationPanel(pendingUser);
+                    isRegisteringFlow = false;
                 };
                 
                 proceedBtn.removeEventListener('click', proceedBtn._listener);
@@ -545,12 +483,10 @@
                 verifyNowBtn._listener = verifyNowHandler;
                 
             } catch (error) {
-                console.error("Registration error:", error);
-                if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                isRegisteringFlow = false;
+                if (error.code === 'permission-denied') {
                     const currentUser = auth.currentUser;
-                    if (currentUser) {
-                        try { await currentUser.delete(); } catch(e) {}
-                    }
+                    if (currentUser) await currentUser.delete().catch(()=>{});
                     showAlert("Permission error: Unable to create account. Please contact support.", "error");
                 } else if (error.code === 'auth/email-already-in-use') {
                     showAlert('Email already registered. Please log in.', 'error');
@@ -560,13 +496,13 @@
             }
         }
         
-        // Login handlers
         async function handleLogin() {
             const email = document.getElementById('loginEmail').value;
             const pwd = document.getElementById('loginPassword').value;
             if(!email || !pwd) return showAlert('Enter email and password');
             try {
                 await auth.signInWithEmailAndPassword(email, pwd);
+                // redirect handled by onAuthStateChanged (not blocked)
             } catch(e) { showAlert(e.message); }
         }
         
@@ -596,14 +532,18 @@
                     await userRef.set(data);
                     if(referredBy) await db.collection('referrals').add({ referrerId: referredBy, referredId: user.uid, referredEmail: user.email, referredName: user.displayName, status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                 }
-                // Google always verified, redirect will happen in onAuthStateChanged
+                // redirect via onAuthStateChanged
             } catch(e) { showAlert(e.message); }
         }
         
-        // Auth state listener: redirect only when not blocked and no modal/verification active
         auth.onAuthStateChanged(async (user) => {
             if (!user) return;
-            if (blockAutoRedirect || sessionStorage.getItem('skipRedirectForVerification') === 'true') return;
+            if (isRegisteringFlow) return; // critical: block redirect during registration
+            
+            // Also check if modal or verification panel is visible (extra safety)
+            const modalVisible = document.getElementById('verifyLaterModalOverlay').classList.contains('active');
+            const verifyPanelVisible = !document.getElementById('verificationPanel').classList.contains('hidden');
+            if (modalVisible || verifyPanelVisible) return;
             
             const isGoogle = user.providerData && user.providerData.some(p => p?.providerId === 'google.com');
             try {
@@ -625,13 +565,12 @@
                 const redirectTarget = userData.role === 'admin' ? 'admin-dashboard.html' : 'user-dashboard.html';
                 window.location.href = redirectTarget;
             } catch (err) {
-                console.error("Auth state error", err);
+                console.error(err);
                 await auth.signOut();
                 showAlert("Session error. Please log in again.", "error");
             }
         });
         
-        // Remove intro overlay after delay
         window.addEventListener('load', () => {
             setTimeout(() => {
                 const intro = document.getElementById('introOverlay');
